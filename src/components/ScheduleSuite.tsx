@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import {
-  useLeague, isManualOnly, isWeekComplete, maxScheduledWeek, type FixtureEntry,
+  useLeague, isManualOnly, isWeekComplete, type FixtureEntry,
 } from "@/state/league";
 import { SimulationTerminal } from "@/components/SimulationTerminal";
 import { FixtureBuilder } from "@/components/FixtureBuilder";
