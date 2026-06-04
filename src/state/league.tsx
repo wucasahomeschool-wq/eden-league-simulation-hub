@@ -265,6 +265,11 @@ interface LeagueContextValue {
   updateBudget: (team: string, budget: string) => void;
   updatePlayer: (team: string, index: number, patch: Partial<LeaguePlayer>) => void;
   toggleStarter: (team: string, index: number) => void;
+  addFixtures: (entries: { week: number; home: string; away: string }[]) => void;
+  removeFixture: (fixtureId: string) => void;
+  startNewSeason: () => void;
+  generatePlayoffs: () => void;
+  setPlayoffResult: (matchId: string, homeGoals: number, awayGoals: number, method: "SIM" | "MANUAL") => void;
   resetLeague: () => void;
   standings: StandingRow[];
 }
