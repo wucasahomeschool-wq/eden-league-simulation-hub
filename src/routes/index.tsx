@@ -5,6 +5,7 @@ import { SimulationTerminal } from "@/components/SimulationTerminal";
 import { ScheduleSuite } from "@/components/ScheduleSuite";
 import { StandingsSuite } from "@/components/StandingsSuite";
 import { TeamEditorSuite } from "@/components/TeamEditorSuite";
+import { PlayoffsSuite } from "@/components/PlayoffsSuite";
 
 export const Route = createFileRoute("/")({
   head: () => ({
