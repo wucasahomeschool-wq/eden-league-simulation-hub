@@ -327,6 +327,48 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         );
         return { ...prev, teams: { ...prev.teams, [team]: { ...prev.teams[team], players } } };
       }),
+    addFixtures: (entries) =>
+      setState((prev) => {
+        const base = prev.fixtures.length;
+        const added: FixtureEntry[] = entries.map((e, i) => ({
+          id: `s${prev.season}-w${e.week}-m${base + i}-${Date.now() + i}`,
+          week: e.week,
+          home: e.home,
+          away: e.away,
+        }));
+        return advanceWeekIfComplete({ ...prev, fixtures: [...prev.fixtures, ...added] });
+      }),
+    removeFixture: (fixtureId) =>
+      setState((prev) => {
+        const fixtures = prev.fixtures.filter((f) => f.id !== fixtureId);
+        const results = { ...prev.results };
+        delete results[fixtureId];
+        return { ...prev, fixtures, results };
+      }),
+    startNewSeason: () =>
+      setState((prev) => ({
+        ...prev,
+        season: prev.season + 1,
+        currentWeek: 1,
+        fixtures: [],
+        results: {},
+        playoffs: undefined,
+      })),
+    generatePlayoffs: () =>
+      setState((prev) => {
+        if (prev.playoffs) return prev;
+        return { ...prev, playoffs: buildPlayoffs(prev) };
+      }),
+    setPlayoffResult: (matchId, homeGoals, awayGoals, method) =>
+      setState((prev) => {
+        if (!prev.playoffs) return prev;
+        const rounds = prev.playoffs.rounds.map((round) =>
+          round.map((m) =>
+            m.id === matchId ? { ...m, result: { homeGoals, awayGoals, method } } : m
+          )
+        );
+        return { ...prev, playoffs: advancePlayoffs({ ...prev.playoffs, rounds }) };
+      }),
     resetLeague: () => setState(initState()),
   };
 
