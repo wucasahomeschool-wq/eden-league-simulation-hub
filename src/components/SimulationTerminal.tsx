@@ -23,7 +23,7 @@ export function SimulationTerminal({
   initialHome,
   initialAway,
   lockTeams = false,
-  defaultTempoIndex = 2,
+  defaultTempoIndex = 1,
   onComplete,
   fullscreen = false,
   onExit,
@@ -34,7 +34,7 @@ export function SimulationTerminal({
   const [home, setHome] = useState(initialHome ?? teams[0]);
   const [away, setAway] = useState(initialAway ?? teams[1]);
   const [tempoIdx, setTempoIdx] = useState(defaultTempoIndex);
-  const [goalMult, setGoalMult] = useState(0.6);
+  const [goalMult, setGoalMult] = useState(0.5);
 
   const [running, setRunning] = useState(false);
   const [lines, setLines] = useState<string[]>([]);
@@ -115,9 +115,9 @@ export function SimulationTerminal({
             <span>Goal Multiplier</span>
             <span className="text-primary">{goalMult.toFixed(1)}x</span>
           </div>
-          <Slider min={0.5} max={2.0} step={0.1} value={[goalMult]} onValueChange={(v) => setGoalMult(v[0])} />
+          <Slider min={0.1} max={2.0} step={0.1} value={[goalMult]} onValueChange={(v) => setGoalMult(v[0])} />
           <div className="mt-2 flex justify-between text-xs text-muted-foreground">
-            <span>0.5 Defensive</span><span>2.0 Offensive</span>
+            <span>0.1 Defensive</span><span>2.0 Offensive</span>
           </div>
         </div>
       </div>
