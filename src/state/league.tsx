@@ -294,15 +294,9 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     const weekFixtures = next.fixtures.filter((f) => f.week === wk);
     const allPlayed = weekFixtures.length > 0 && weekFixtures.every((f) => next.results[f.id]);
     if (!allPlayed) return next;
-
-    // If week 12 just completed and Final Four not yet generated, generate it.
-    let fixtures = next.fixtures;
-    if (wk === 12 && !next.fixtures.some((f) => f.week >= 13)) {
-      fixtures = [...next.fixtures, ...generateFinalFour(next)];
-    }
-    const maxWeek = Math.max(...fixtures.map((f) => f.week));
+    const maxWeek = maxScheduledWeek(next);
     const newWeek = wk < maxWeek ? wk + 1 : wk;
-    return { ...next, fixtures, currentWeek: newWeek };
+    return { ...next, currentWeek: newWeek };
   }
 
   const value: LeagueContextValue = {
