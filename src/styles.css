@@ -46,33 +46,33 @@
 
 :root {
   --radius: 0.5rem;
-  /* Soft analytical neutrals */
-  --background: oklch(0.985 0.002 250);
-  --foreground: oklch(0.27 0.02 255);
+  /* Pitch-inspired greens on clean white */
+  --background: oklch(0.985 0.012 150);
+  --foreground: oklch(0.27 0.04 160);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.27 0.02 255);
+  --card-foreground: oklch(0.27 0.04 160);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.27 0.02 255);
-  /* Steel blue primary (muted, professional) */
-  --primary: oklch(0.5 0.07 240);
-  --primary-foreground: oklch(0.99 0.002 250);
-  --secondary: oklch(0.95 0.005 250);
-  --secondary-foreground: oklch(0.32 0.02 255);
-  --muted: oklch(0.955 0.004 250);
-  --muted-foreground: oklch(0.52 0.015 255);
-  --accent: oklch(0.93 0.02 235);
-  --accent-foreground: oklch(0.3 0.04 245);
+  --popover-foreground: oklch(0.27 0.04 160);
+  /* Grass green primary */
+  --primary: oklch(0.55 0.14 150);
+  --primary-foreground: oklch(0.99 0.005 150);
+  --secondary: oklch(0.95 0.02 150);
+  --secondary-foreground: oklch(0.32 0.05 160);
+  --muted: oklch(0.955 0.015 150);
+  --muted-foreground: oklch(0.5 0.03 160);
+  --accent: oklch(0.92 0.05 150);
+  --accent-foreground: oklch(0.3 0.08 155);
   --destructive: oklch(0.55 0.18 25);
   --destructive-foreground: oklch(0.99 0.002 250);
-  --success: oklch(0.62 0.13 150);
+  --success: oklch(0.6 0.15 150);
   --success-foreground: oklch(0.99 0.002 250);
-  --starter: oklch(0.93 0.05 150);
-  --border: oklch(0.9 0.006 250);
-  --input: oklch(0.9 0.006 250);
-  --ring: oklch(0.5 0.07 240);
-  --panel: oklch(0.97 0.003 250);
-  --console-bg: oklch(0.96 0.004 250);
-  --console-fg: oklch(0.3 0.02 255);
+  --starter: oklch(0.9 0.08 145);
+  --border: oklch(0.9 0.018 150);
+  --input: oklch(0.9 0.018 150);
+  --ring: oklch(0.55 0.14 150);
+  --panel: oklch(0.965 0.018 150);
+  --console-bg: oklch(0.96 0.02 150);
+  --console-fg: oklch(0.3 0.05 160);
 }
 
 @layer base {
