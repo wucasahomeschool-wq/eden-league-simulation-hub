@@ -102,7 +102,7 @@ function initState(): LeagueState {
     home: f.home,
     away: f.away,
   }));
-  return { currentWeek: 1, teamOrder, teams, fixtures, results: {} };
+  return { currentWeek: 1, season: 1, teamOrder, teams, fixtures, results: {} };
 }
 
 function loadState(): LeagueState {
@@ -110,6 +110,12 @@ function loadState(): LeagueState {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw) as LeagueState;
+    // Migrate legacy v1 state (no season / playoffs fields).
+    const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacy) {
+      const parsed = JSON.parse(legacy) as Partial<LeagueState>;
+      return { season: 1, ...parsed } as LeagueState;
+    }
   } catch {
     /* ignore corrupt state */
   }
