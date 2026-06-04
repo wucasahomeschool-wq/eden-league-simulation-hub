@@ -150,24 +150,82 @@ export function computeStandings(state: LeagueState): StandingRow[] {
   return list;
 }
 
-// ---------------- Final Four generation (weeks 13-16) ----------------
-function generateFinalFour(state: LeagueState): FixtureEntry[] {
-  const standings = computeStandings(state);
-  const seeds = standings.map((s) => s.team);
-  const out: FixtureEntry[] = [];
-  for (let k = 0; k < 4; k++) {
-    const week = 13 + k;
-    const rotated = [...seeds.slice(k), ...seeds.slice(0, k)];
-    for (let i = 0; i + 1 < rotated.length; i += 2) {
-      out.push({
-        id: `w${week}-m${i / 2}`,
-        week,
-        home: rotated[i],
-        away: rotated[i + 1],
-      });
-    }
+// ---------------- Schedule helpers ----------------
+export function isWeekComplete(state: LeagueState, week: number): boolean {
+  const wk = state.fixtures.filter((f) => f.week === week);
+  return wk.length > 0 && wk.every((f) => state.results[f.id]);
+}
+
+export function maxScheduledWeek(state: LeagueState): number {
+  return state.fixtures.reduce((m, f) => Math.max(m, f.week), 0);
+}
+
+const ROUND_NAMES = ["", "Wild Card", "Divisional", "Semifinal", "Final"];
+export const PLAYOFF_ROUND_NAMES = ROUND_NAMES;
+
+// ---------------- Playoffs (NFL-style reseeding) ----------------
+// Pair an ordered (by seed, best first) list top-vs-bottom; higher seed is home.
+function buildRound(
+  round: number,
+  participants: { team: string; seed: number }[]
+): PlayoffMatch[] {
+  const sorted = [...participants].sort((a, b) => a.seed - b.seed);
+  const out: PlayoffMatch[] = [];
+  const n = sorted.length;
+  for (let i = 0; i < n / 2; i++) {
+    const high = sorted[i];
+    const low = sorted[n - 1 - i];
+    out.push({
+      id: `po-r${round}-m${i}`,
+      round,
+      homeSeed: high.seed,
+      awaySeed: low.seed,
+      home: high.team,
+      away: low.team,
+    });
   }
   return out;
+}
+
+export function matchWinner(m: PlayoffMatch): string | null {
+  if (!m.result) return null;
+  if (m.result.homeGoals > m.result.awayGoals) return m.home;
+  if (m.result.awayGoals > m.result.homeGoals) return m.away;
+  return null; // tie — must be resolved before advancing
+}
+
+function buildPlayoffs(state: LeagueState): PlayoffsState {
+  const seeds = computeStandings(state).slice(0, 14).map((s) => s.team);
+  // Round 1: seeds 3..14 (seeds 1 & 2 get a bye).
+  const wildCard = seeds.slice(2).map((team, i) => ({ team, seed: i + 3 }));
+  return { seeds, rounds: [buildRound(1, wildCard)] };
+}
+
+function seedOf(playoffs: PlayoffsState, team: string): number {
+  return playoffs.seeds.indexOf(team) + 1;
+}
+
+// If the latest round is fully decided, generate the next round (or crown a champion).
+function advancePlayoffs(playoffs: PlayoffsState): PlayoffsState {
+  const last = playoffs.rounds[playoffs.rounds.length - 1];
+  const winners = last.map(matchWinner);
+  if (winners.some((w) => w === null)) return playoffs; // not all decided
+  const roundNum = last[0].round;
+
+  if (roundNum === 4) {
+    return { ...playoffs, champion: winners[0]! };
+  }
+
+  let advancing: string[] = winners as string[];
+  if (roundNum === 1) {
+    // Add the two byes (seeds 1 & 2) into the Divisional round.
+    advancing = [playoffs.seeds[0], playoffs.seeds[1], ...advancing];
+  }
+  if (advancing.length < 2) return playoffs;
+
+  const participants = advancing.map((team) => ({ team, seed: seedOf(playoffs, team) }));
+  const next = buildRound(roundNum + 1, participants);
+  return { ...playoffs, rounds: [...playoffs.rounds, next] };
 }
 
 export function isManualOnly(home: string, away: string): boolean {
