@@ -5,7 +5,8 @@ import { INITIAL_BUDGETS } from "@/data/budgets";
 import { INITIAL_SCHEDULE, MANUAL_ONLY_TEAMS } from "@/data/schedule";
 import { buildEngineTeam, run_match } from "@/engine/engine";
 
-const STORAGE_KEY = "eden_league_state_v1";
+const STORAGE_KEY = "eden_league_state_v2";
+const LEGACY_STORAGE_KEY = "eden_league_state_v1";
 
 export const ATTR_KEYS = [
   "rating", "FIN", "SHO", "PAS", "VIS", "DRI", "PAC", "STA",
@@ -42,12 +43,30 @@ export interface FixtureEntry {
   away: string;
 }
 
+export interface PlayoffMatch {
+  id: string;
+  round: number; // 1 = Wild Card, 2 = Divisional, 3 = Semifinal, 4 = Final
+  homeSeed: number;
+  awaySeed: number;
+  home: string;
+  away: string;
+  result?: MatchRecord;
+}
+
+export interface PlayoffsState {
+  seeds: string[]; // top 14, index 0 = seed 1
+  rounds: PlayoffMatch[][]; // rounds[0] = Wild Card, etc.
+  champion?: string;
+}
+
 export interface LeagueState {
   currentWeek: number;
+  season: number;
   teamOrder: string[];
   teams: Record<string, LeagueTeam>;
   fixtures: FixtureEntry[];
   results: Record<string, MatchRecord>;
+  playoffs?: PlayoffsState;
 }
 
 export interface StandingRow {
@@ -83,7 +102,7 @@ function initState(): LeagueState {
     home: f.home,
     away: f.away,
   }));
-  return { currentWeek: 1, teamOrder, teams, fixtures, results: {} };
+  return { currentWeek: 1, season: 1, teamOrder, teams, fixtures, results: {} };
 }
 
 function loadState(): LeagueState {
@@ -91,6 +110,12 @@ function loadState(): LeagueState {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw) as LeagueState;
+    // Migrate legacy v1 state (no season / playoffs fields).
+    const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacy) {
+      const parsed = JSON.parse(legacy) as Partial<LeagueState>;
+      return { season: 1, ...parsed } as LeagueState;
+    }
   } catch {
     /* ignore corrupt state */
   }
@@ -125,24 +150,82 @@ export function computeStandings(state: LeagueState): StandingRow[] {
   return list;
 }
 
-// ---------------- Final Four generation (weeks 13-16) ----------------
-function generateFinalFour(state: LeagueState): FixtureEntry[] {
-  const standings = computeStandings(state);
-  const seeds = standings.map((s) => s.team);
-  const out: FixtureEntry[] = [];
-  for (let k = 0; k < 4; k++) {
-    const week = 13 + k;
-    const rotated = [...seeds.slice(k), ...seeds.slice(0, k)];
-    for (let i = 0; i + 1 < rotated.length; i += 2) {
-      out.push({
-        id: `w${week}-m${i / 2}`,
-        week,
-        home: rotated[i],
-        away: rotated[i + 1],
-      });
-    }
+// ---------------- Schedule helpers ----------------
+export function isWeekComplete(state: LeagueState, week: number): boolean {
+  const wk = state.fixtures.filter((f) => f.week === week);
+  return wk.length > 0 && wk.every((f) => state.results[f.id]);
+}
+
+export function maxScheduledWeek(state: LeagueState): number {
+  return state.fixtures.reduce((m, f) => Math.max(m, f.week), 0);
+}
+
+const ROUND_NAMES = ["", "Wild Card", "Divisional", "Semifinal", "Final"];
+export const PLAYOFF_ROUND_NAMES = ROUND_NAMES;
+
+// ---------------- Playoffs (NFL-style reseeding) ----------------
+// Pair an ordered (by seed, best first) list top-vs-bottom; higher seed is home.
+function buildRound(
+  round: number,
+  participants: { team: string; seed: number }[]
+): PlayoffMatch[] {
+  const sorted = [...participants].sort((a, b) => a.seed - b.seed);
+  const out: PlayoffMatch[] = [];
+  const n = sorted.length;
+  for (let i = 0; i < n / 2; i++) {
+    const high = sorted[i];
+    const low = sorted[n - 1 - i];
+    out.push({
+      id: `po-r${round}-m${i}`,
+      round,
+      homeSeed: high.seed,
+      awaySeed: low.seed,
+      home: high.team,
+      away: low.team,
+    });
   }
   return out;
+}
+
+export function matchWinner(m: PlayoffMatch): string | null {
+  if (!m.result) return null;
+  if (m.result.homeGoals > m.result.awayGoals) return m.home;
+  if (m.result.awayGoals > m.result.homeGoals) return m.away;
+  return null; // tie — must be resolved before advancing
+}
+
+function buildPlayoffs(state: LeagueState): PlayoffsState {
+  const seeds = computeStandings(state).slice(0, 14).map((s) => s.team);
+  // Round 1: seeds 3..14 (seeds 1 & 2 get a bye).
+  const wildCard = seeds.slice(2).map((team, i) => ({ team, seed: i + 3 }));
+  return { seeds, rounds: [buildRound(1, wildCard)] };
+}
+
+function seedOf(playoffs: PlayoffsState, team: string): number {
+  return playoffs.seeds.indexOf(team) + 1;
+}
+
+// If the latest round is fully decided, generate the next round (or crown a champion).
+function advancePlayoffs(playoffs: PlayoffsState): PlayoffsState {
+  const last = playoffs.rounds[playoffs.rounds.length - 1];
+  const winners = last.map(matchWinner);
+  if (winners.some((w) => w === null)) return playoffs; // not all decided
+  const roundNum = last[0].round;
+
+  if (roundNum === 4) {
+    return { ...playoffs, champion: winners[0]! };
+  }
+
+  let advancing: string[] = winners as string[];
+  if (roundNum === 1) {
+    // Add the two byes (seeds 1 & 2) into the Divisional round.
+    advancing = [playoffs.seeds[0], playoffs.seeds[1], ...advancing];
+  }
+  if (advancing.length < 2) return playoffs;
+
+  const participants = advancing.map((team) => ({ team, seed: seedOf(playoffs, team) }));
+  const next = buildRound(roundNum + 1, participants);
+  return { ...playoffs, rounds: [...playoffs.rounds, next] };
 }
 
 export function isManualOnly(home: string, away: string): boolean {
@@ -182,6 +265,11 @@ interface LeagueContextValue {
   updateBudget: (team: string, budget: string) => void;
   updatePlayer: (team: string, index: number, patch: Partial<LeaguePlayer>) => void;
   toggleStarter: (team: string, index: number) => void;
+  addFixtures: (entries: { week: number; home: string; away: string }[]) => void;
+  removeFixture: (fixtureId: string) => void;
+  startNewSeason: () => void;
+  generatePlayoffs: () => void;
+  setPlayoffResult: (matchId: string, homeGoals: number, awayGoals: number, method: "SIM" | "MANUAL") => void;
   resetLeague: () => void;
   standings: StandingRow[];
 }
@@ -206,15 +294,9 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     const weekFixtures = next.fixtures.filter((f) => f.week === wk);
     const allPlayed = weekFixtures.length > 0 && weekFixtures.every((f) => next.results[f.id]);
     if (!allPlayed) return next;
-
-    // If week 12 just completed and Final Four not yet generated, generate it.
-    let fixtures = next.fixtures;
-    if (wk === 12 && !next.fixtures.some((f) => f.week >= 13)) {
-      fixtures = [...next.fixtures, ...generateFinalFour(next)];
-    }
-    const maxWeek = Math.max(...fixtures.map((f) => f.week));
+    const maxWeek = maxScheduledWeek(next);
     const newWeek = wk < maxWeek ? wk + 1 : wk;
-    return { ...next, fixtures, currentWeek: newWeek };
+    return { ...next, currentWeek: newWeek };
   }
 
   const value: LeagueContextValue = {
@@ -244,6 +326,48 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
           i === index ? { ...p, starter: !p.starter } : p
         );
         return { ...prev, teams: { ...prev.teams, [team]: { ...prev.teams[team], players } } };
+      }),
+    addFixtures: (entries) =>
+      setState((prev) => {
+        const base = prev.fixtures.length;
+        const added: FixtureEntry[] = entries.map((e, i) => ({
+          id: `s${prev.season}-w${e.week}-m${base + i}-${Date.now() + i}`,
+          week: e.week,
+          home: e.home,
+          away: e.away,
+        }));
+        return advanceWeekIfComplete({ ...prev, fixtures: [...prev.fixtures, ...added] });
+      }),
+    removeFixture: (fixtureId) =>
+      setState((prev) => {
+        const fixtures = prev.fixtures.filter((f) => f.id !== fixtureId);
+        const results = { ...prev.results };
+        delete results[fixtureId];
+        return { ...prev, fixtures, results };
+      }),
+    startNewSeason: () =>
+      setState((prev) => ({
+        ...prev,
+        season: prev.season + 1,
+        currentWeek: 1,
+        fixtures: [],
+        results: {},
+        playoffs: undefined,
+      })),
+    generatePlayoffs: () =>
+      setState((prev) => {
+        if (prev.playoffs) return prev;
+        return { ...prev, playoffs: buildPlayoffs(prev) };
+      }),
+    setPlayoffResult: (matchId, homeGoals, awayGoals, method) =>
+      setState((prev) => {
+        if (!prev.playoffs) return prev;
+        const rounds = prev.playoffs.rounds.map((round) =>
+          round.map((m) =>
+            m.id === matchId ? { ...m, result: { homeGoals, awayGoals, method } } : m
+          )
+        );
+        return { ...prev, playoffs: advancePlayoffs({ ...prev.playoffs, rounds }) };
       }),
     resetLeague: () => setState(initState()),
   };
