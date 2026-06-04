@@ -46,33 +46,33 @@
 
 :root {
   --radius: 0.5rem;
-  /* Pitch-inspired greens on clean white */
-  --background: oklch(0.985 0.012 150);
-  --foreground: oklch(0.27 0.04 160);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.27 0.04 160);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.27 0.04 160);
-  /* Grass green primary */
-  --primary: oklch(0.55 0.14 150);
-  --primary-foreground: oklch(0.99 0.005 150);
-  --secondary: oklch(0.95 0.02 150);
-  --secondary-foreground: oklch(0.32 0.05 160);
-  --muted: oklch(0.955 0.015 150);
-  --muted-foreground: oklch(0.5 0.03 160);
-  --accent: oklch(0.92 0.05 150);
-  --accent-foreground: oklch(0.3 0.08 155);
+  /* Pitch-inspired true greens (no teal) on white */
+  --background: oklch(0.965 0.04 142);
+  --foreground: oklch(0.25 0.05 142);
+  --card: oklch(0.995 0.008 142);
+  --card-foreground: oklch(0.25 0.05 142);
+  --popover: oklch(0.995 0.008 142);
+  --popover-foreground: oklch(0.25 0.05 142);
+  /* Lighter grass green for interactive elements */
+  --primary: oklch(0.62 0.15 142);
+  --primary-foreground: oklch(0.99 0.005 142);
+  --secondary: oklch(0.93 0.05 142);
+  --secondary-foreground: oklch(0.3 0.06 142);
+  --muted: oklch(0.94 0.04 142);
+  --muted-foreground: oklch(0.48 0.04 142);
+  --accent: oklch(0.9 0.08 142);
+  --accent-foreground: oklch(0.28 0.09 142);
   --destructive: oklch(0.55 0.18 25);
   --destructive-foreground: oklch(0.99 0.002 250);
-  --success: oklch(0.6 0.15 150);
+  --success: oklch(0.6 0.16 142);
   --success-foreground: oklch(0.99 0.002 250);
-  --starter: oklch(0.9 0.08 145);
-  --border: oklch(0.9 0.018 150);
-  --input: oklch(0.9 0.018 150);
-  --ring: oklch(0.55 0.14 150);
-  --panel: oklch(0.965 0.018 150);
-  --console-bg: oklch(0.96 0.02 150);
-  --console-fg: oklch(0.3 0.05 160);
+  --starter: oklch(0.88 0.1 138);
+  --border: oklch(0.86 0.04 142);
+  --input: oklch(0.86 0.04 142);
+  --ring: oklch(0.62 0.15 142);
+  --panel: oklch(0.93 0.055 142);
+  --console-bg: oklch(0.92 0.05 142);
+  --console-fg: oklch(0.28 0.06 142);
 }
 
 @layer base {
