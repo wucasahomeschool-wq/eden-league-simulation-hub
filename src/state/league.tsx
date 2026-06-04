@@ -43,12 +43,30 @@ export interface FixtureEntry {
   away: string;
 }
 
+export interface PlayoffMatch {
+  id: string;
+  round: number; // 1 = Wild Card, 2 = Divisional, 3 = Semifinal, 4 = Final
+  homeSeed: number;
+  awaySeed: number;
+  home: string;
+  away: string;
+  result?: MatchRecord;
+}
+
+export interface PlayoffsState {
+  seeds: string[]; // top 14, index 0 = seed 1
+  rounds: PlayoffMatch[][]; // rounds[0] = Wild Card, etc.
+  champion?: string;
+}
+
 export interface LeagueState {
   currentWeek: number;
+  season: number;
   teamOrder: string[];
   teams: Record<string, LeagueTeam>;
   fixtures: FixtureEntry[];
   results: Record<string, MatchRecord>;
+  playoffs?: PlayoffsState;
 }
 
 export interface StandingRow {
