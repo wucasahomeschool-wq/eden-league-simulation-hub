@@ -23,7 +23,7 @@ export function SimulationTerminal({
   initialHome,
   initialAway,
   lockTeams = false,
-  defaultTempoIndex = 2,
+  defaultTempoIndex = 1,
   onComplete,
   fullscreen = false,
   onExit,
