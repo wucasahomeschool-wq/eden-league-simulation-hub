@@ -5,7 +5,8 @@ import { INITIAL_BUDGETS } from "@/data/budgets";
 import { INITIAL_SCHEDULE, MANUAL_ONLY_TEAMS } from "@/data/schedule";
 import { buildEngineTeam, run_match } from "@/engine/engine";
 
-const STORAGE_KEY = "eden_league_state_v1";
+const STORAGE_KEY = "eden_league_state_v2";
+const LEGACY_STORAGE_KEY = "eden_league_state_v1";
 
 export const ATTR_KEYS = [
   "rating", "FIN", "SHO", "PAS", "VIS", "DRI", "PAC", "STA",
