@@ -157,7 +157,7 @@ export function ScheduleSuite() {
           lockTeams
           defaultTempoIndex={1}
           fullscreen
-          onComplete={(h, a) => setResult(simFixture.id, h, a, "SIM")}
+          onComplete={(h, a, injured) => setResult(simFixture.id, h, a, "SIM", injured)}
           onExit={() => setSimFixture(null)}
         />
       )}
