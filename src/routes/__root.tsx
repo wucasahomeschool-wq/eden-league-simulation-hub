@@ -77,14 +77,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "Eden League Simulation Hub" },
+      { name: "description", content: "Simulation App for all Eden League purposes" },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "Eden League Simulation Hub" },
+      { property: "og:description", content: "Simulation App for all Eden League purposes" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Eden League Simulation Hub" },
+      { name: "twitter:description", content: "Simulation App for all Eden League purposes" },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/11eb8cfb-d88a-4d47-b2b0-ba95468b2620/id-preview-99c62fde--8efa3440-e1d7-4b04-aae9-bd1f1c8126c0.lovable.app-1780717187389.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/11eb8cfb-d88a-4d47-b2b0-ba95468b2620/id-preview-99c62fde--8efa3440-e1d7-4b04-aae9-bd1f1c8126c0.lovable.app-1780717187389.png" },
     ],
     links: [
       {
