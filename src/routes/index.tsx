@@ -53,9 +53,12 @@ function Hub() {
           >
             ‹
           </button>
-          <div className="text-center">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Eden League Data Hub
+          <div className="flex flex-col items-center text-center">
+            <div className="flex items-center gap-2">
+              <img src={edenLogo.url} alt="Eden League crest" className="h-8 w-8 object-contain" />
+              <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                Eden League Data Hub
+              </div>
             </div>
             <h1 className="text-lg font-extrabold tracking-tight sm:text-xl">
               {SUITES[idx].name}
