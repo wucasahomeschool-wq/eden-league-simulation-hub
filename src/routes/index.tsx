@@ -6,6 +6,8 @@ import { ScheduleSuite } from "@/components/ScheduleSuite";
 import { StandingsSuite } from "@/components/StandingsSuite";
 import { TeamEditorSuite } from "@/components/TeamEditorSuite";
 import { PlayoffsSuite } from "@/components/PlayoffsSuite";
+import { TradesSuite } from "@/components/TradesSuite";
+import edenLogo from "@/assets/eden-league-logo.png.asset.json";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,6 +30,7 @@ const SUITES = [
   { name: "Season Schedule", render: () => <ScheduleSuite /> },
   { name: "League Standings", render: () => <StandingsSuite /> },
   { name: "Playoffs", render: () => <PlayoffsSuite /> },
+  { name: "Trades", render: () => <TradesSuite /> },
   { name: "Team Editor", render: () => <TeamEditorSuite /> },
 ];
 
