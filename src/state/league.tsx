@@ -150,9 +150,9 @@ function normalize(state: LeagueState): LeagueState {
     teams[name] = {
       ...t,
       players: t.players.map((p) => ({
-        injuryWeeks: 0,
-        suspensionWeeks: 0,
         ...p,
+        injuryWeeks: p.injuryWeeks ?? 0,
+        suspensionWeeks: p.suspensionWeeks ?? 0,
       })),
     };
   }
