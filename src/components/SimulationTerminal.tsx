@@ -14,7 +14,7 @@ interface Props {
   initialAway?: string;
   lockTeams?: boolean;
   defaultTempoIndex?: number;
-  onComplete?: (homeGoals: number, awayGoals: number) => void;
+  onComplete?: (homeGoals: number, awayGoals: number, injured: { team: string; name: string }[]) => void;
   fullscreen?: boolean;
   onExit?: () => void;
 }
@@ -66,7 +66,7 @@ export function SimulationTerminal({
         timerRef.current = null;
         setScore({ h: result.homeGoals, a: result.awayGoals });
         setRunning(false);
-        onComplete?.(result.homeGoals, result.awayGoals);
+        onComplete?.(result.homeGoals, result.awayGoals, result.injured);
       }
     }, 45);
   }
