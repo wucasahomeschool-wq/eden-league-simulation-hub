@@ -3,21 +3,17 @@ import {
   useLeague, isManualOnly, isWeekComplete, type FixtureEntry,
 } from "@/state/league";
 import { SimulationTerminal } from "@/components/SimulationTerminal";
-import { FixtureBuilder } from "@/components/FixtureBuilder";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
-const REGULAR_WEEKS = Array.from({ length: 12 }, (_, i) => i + 1);
-const FINAL_FOUR_WEEKS = [13, 14, 15, 16];
-
 export function ScheduleSuite() {
-  const { state, setResult, startNewSeason } = useLeague();
+  const { state, setResult, resetMatchResult, rollbackWeek, canRollback } = useLeague();
   const [simFixture, setSimFixture] = useState<FixtureEntry | null>(null);
   const [manualFixture, setManualFixture] = useState<FixtureEntry | null>(null);
-  const [confirmNewSeason, setConfirmNewSeason] = useState(false);
+  const [confirmRollback, setConfirmRollback] = useState(false);
 
   const weeks = useMemo(() => {
     const map = new Map<number, FixtureEntry[]>();
@@ -32,10 +28,6 @@ export function ScheduleSuite() {
   const finalFourExists = state.fixtures.some((f) => f.week >= 13);
   const week16Done = isWeekComplete(state, 16);
   const preSeason = state.fixtures.length === 0;
-  // Which regular weeks still need fixtures entered (1-12).
-  const missingRegularWeeks = REGULAR_WEEKS.filter(
-    (w) => !state.fixtures.some((f) => f.week === w)
-  );
 
   return (
     <div>
@@ -47,36 +39,26 @@ export function ScheduleSuite() {
           </p>
           <p className="text-xs text-muted-foreground">
             {preSeason
-              ? "Pre-season — enter Weeks 1–12 to begin"
+              ? "Pre-season — schedule Weeks 1–12 in the Match Scheduling suite"
               : state.currentWeek <= 12
               ? `${12 - state.currentWeek + 1} regular weeks + Final Four remaining`
               : "Final Four phase"}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setConfirmNewSeason(true)}>
-          START NEW SEASON
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!canRollback}
+          onClick={() => setConfirmRollback(true)}
+        >
+          ROLLBACK WEEK
         </Button>
       </div>
 
-      {/* Pre-season: build regular schedule */}
-      {missingRegularWeeks.length > 0 && (
-        <div className="mb-6 space-y-3">
-          <div className="rounded-xl border bg-panel/50 p-4 text-sm">
-            <p className="font-semibold">Set up Season {state.season}</p>
-            <p className="mt-1 text-muted-foreground">
-              Run the Eden League draft and review every squad in the <strong>Team Editor</strong> first.
-              Then enter the AI-generated Weeks 1–12 fixtures below to start the season.
-            </p>
-          </div>
-          <FixtureBuilder weeks={missingRegularWeeks} title="Build Regular Season (Weeks 1–12)" />
-        </div>
-      )}
-
-      {/* Final Four builder: after Week 12 completes, manual entry */}
-      {week12Done && !finalFourExists && (
-        <div className="mb-6 grid gap-4 lg:grid-cols-[1.2fr_1fr]">
-          <FixtureBuilder weeks={FINAL_FOUR_WEEKS} title="Build Final Four (Weeks 13–16)" />
-          <StandingsReference />
+      {preSeason && (
+        <div className="mb-6 rounded-xl border bg-panel/50 p-6 text-center text-sm text-muted-foreground">
+          No fixtures yet. Open the <strong className="text-foreground">Match Scheduling</strong> suite to
+          run the draft / Team Editor changes and lay down a fresh Weeks 1–12 schedule.
         </div>
       )}
 
@@ -126,9 +108,17 @@ export function ScheduleSuite() {
                         </div>
                       )}
                       {r && (
-                        <span className="col-span-3 mt-0.5 text-center text-[10px] uppercase text-muted-foreground">
-                          {r.method === "SIM" ? "Simulated" : "Manual entry"}
-                        </span>
+                        <div className="col-span-3 mt-0.5 flex items-center justify-center gap-3">
+                          <span className="text-[10px] uppercase text-muted-foreground">
+                            {r.method === "SIM" ? "Simulated" : "Manual entry"}
+                          </span>
+                          <button
+                            onClick={() => resetMatchResult(fx.id)}
+                            className="text-[10px] font-semibold uppercase text-destructive hover:underline"
+                          >
+                            Reset result
+                          </button>
+                        </div>
                       )}
                     </li>
                   );
@@ -140,6 +130,11 @@ export function ScheduleSuite() {
         {!preSeason && state.currentWeek === 12 && !week12Done && (
           <p className="text-center text-xs text-muted-foreground">
             Final Four (Weeks 13–16) unlock once Week 12 is fully recorded.
+          </p>
+        )}
+        {week12Done && !finalFourExists && (
+          <p className="text-center text-xs font-semibold text-primary">
+            Week 12 complete — open the Match Scheduling suite to build the Final Four.
           </p>
         )}
         {week16Done && (
@@ -157,7 +152,10 @@ export function ScheduleSuite() {
           lockTeams
           defaultTempoIndex={1}
           fullscreen
-          onComplete={(h, a, injured) => setResult(simFixture.id, h, a, "SIM", injured)}
+          onComplete={(h, a, payload) => {
+            setResult(simFixture.id, h, a, "SIM", payload);
+            setSimFixture(null);
+          }}
           onExit={() => setSimFixture(null)}
         />
       )}
@@ -172,57 +170,25 @@ export function ScheduleSuite() {
         }}
       />
 
-      {/* New season confirm */}
-      <Dialog open={confirmNewSeason} onOpenChange={setConfirmNewSeason}>
+      {/* Rollback confirm */}
+      <Dialog open={confirmRollback} onOpenChange={setConfirmRollback}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Start Season {state.season + 1}?</DialogTitle>
+            <DialogTitle>Rollback to start of Week {state.currentWeek}?</DialogTitle>
             <DialogDescription>
-              Teams, players and budgets are kept. All match results, fixtures and playoffs are
-              cleared so you can run the draft and enter a fresh Weeks 1–12 schedule.
+              This restores all league data — results, standings, statistics, injuries and
+              suspensions — to the moment the current week began. Any results entered this week will
+              be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmNewSeason(false)}>Cancel</Button>
-            <Button
-              onClick={() => { startNewSeason(); setConfirmNewSeason(false); }}
-            >
-              Start New Season
+            <Button variant="outline" onClick={() => setConfirmRollback(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => { rollbackWeek(); setConfirmRollback(false); }}>
+              Rollback Week
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-function StandingsReference() {
-  const { standings } = useLeague();
-  return (
-    <div className="overflow-x-auto rounded-xl border bg-card">
-      <div className="border-b px-4 py-2.5 text-sm font-bold uppercase tracking-wide">
-        Standings Reference
-      </div>
-      <table className="w-full border-collapse text-xs">
-        <thead>
-          <tr className="border-b bg-panel text-left font-bold uppercase text-muted-foreground">
-            <th className="px-3 py-2">#</th>
-            <th className="px-3 py-2">Team</th>
-            <th className="px-3 py-2 text-center">PTS</th>
-            <th className="px-3 py-2 text-center">GD</th>
-          </tr>
-        </thead>
-        <tbody>
-          {standings.map((row) => (
-            <tr key={row.team} className="border-b last:border-0 odd:bg-muted/40">
-              <td className="px-3 py-1.5 text-center font-mono tabular-nums">{row.rank}</td>
-              <td className="px-3 py-1.5 font-medium">{row.team}</td>
-              <td className="px-3 py-1.5 text-center font-mono font-bold tabular-nums text-primary">{row.pts}</td>
-              <td className="px-3 py-1.5 text-center tabular-nums">{row.gd > 0 ? `+${row.gd}` : row.gd}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
