@@ -139,7 +139,7 @@ export function FixtureBuilder({
 
       <div className="mt-4 flex justify-end">
         <Button onClick={save} disabled={drafts.length === 0} className="px-6 font-semibold">
-          SAVE {drafts.length} FIXTURE{drafts.length === 1 ? "" : "S"}
+          {saveLabelOverride ?? `SAVE ${drafts.length} FIXTURE${drafts.length === 1 ? "" : "S"}`}
         </Button>
       </div>
     </div>
