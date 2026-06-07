@@ -227,6 +227,7 @@ export function TeamEditorSuite() {
         <p className="text-xs text-muted-foreground">
           Green rows = active matchday lineup. Red rows are on the injured/suspended reserve and are
           excluded from the simulation. INJ / SUS are weeks remaining (set manually anytime).
+          OVR is auto-calculated from the attributes (weighted by position) and cannot be edited directly.
         </p>
       </div>
 
