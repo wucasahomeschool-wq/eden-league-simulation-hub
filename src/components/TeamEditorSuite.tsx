@@ -154,19 +154,30 @@ export function TeamEditorSuite() {
                       className="w-12 rounded border border-transparent bg-transparent px-1 py-0.5 text-center uppercase hover:border-border focus:border-ring focus:bg-card focus:outline-none"
                     />
                   </td>
-                  {NUM_COLS.map((c) => (
-                    <td key={c.key} className="px-0.5 py-1 text-center">
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={p[c.key]}
-                        onChange={(e) =>
-                          updatePlayer(team, idx, { [c.key]: parseFloat(e.target.value) || 0 } as never)
-                        }
-                        className="w-12 rounded border border-transparent bg-transparent px-1 py-0.5 text-center tabular-nums hover:border-border focus:border-ring focus:bg-card focus:outline-none"
-                      />
-                    </td>
-                  ))}
+                  {NUM_COLS.map((c) =>
+                    c.key === "rating" ? (
+                      <td key={c.key} className="px-0.5 py-1 text-center">
+                        <span
+                          title="Auto-calculated weighted average of attributes"
+                          className="inline-block w-12 cursor-not-allowed rounded bg-muted px-1 py-0.5 text-center font-mono font-bold tabular-nums text-primary"
+                        >
+                          {p.rating.toFixed(1)}
+                        </span>
+                      </td>
+                    ) : (
+                      <td key={c.key} className="px-0.5 py-1 text-center">
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={p[c.key]}
+                          onChange={(e) =>
+                            updatePlayer(team, idx, { [c.key]: parseFloat(e.target.value) || 0 } as never)
+                          }
+                          className="w-12 rounded border border-transparent bg-transparent px-1 py-0.5 text-center tabular-nums hover:border-border focus:border-ring focus:bg-card focus:outline-none"
+                        />
+                      </td>
+                    )
+                  )}
                   <td className="px-2 py-1 text-center">
                     {p.injuryWeeks > 0 ? (
                       <span className="rounded bg-destructive px-1.5 py-0.5 text-[10px] font-bold uppercase text-destructive-foreground">Injured</span>
