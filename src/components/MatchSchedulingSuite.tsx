@@ -5,7 +5,7 @@ const FINAL_FOUR_WEEKS = [13, 14, 15, 16];
 const REGULAR_WEEKS = Array.from({ length: 12 }, (_, i) => i + 1);
 
 export function MatchSchedulingSuite() {
-  const { state, scheduleFinalFour, scheduleNewSeason, standings } = useLeague();
+  const { state, scheduleFinalFour, scheduleNewSeason } = useLeague();
 
   const week12Done = isWeekComplete(state, 12);
   const finalFourExists = state.fixtures.some((f) => f.week >= 13);
