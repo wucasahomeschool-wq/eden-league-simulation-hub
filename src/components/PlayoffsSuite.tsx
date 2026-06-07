@@ -149,7 +149,7 @@ export function PlayoffsSuite() {
           lockTeams
           defaultTempoIndex={1}
           fullscreen
-          onComplete={(h, a) => setPlayoffResult(simMatch.id, h, a, "SIM")}
+          onComplete={(h, a, payload) => { setPlayoffResult(simMatch.id, h, a, "SIM", payload); setSimMatch(null); }}
           onExit={() => setSimMatch(null)}
         />
       )}
