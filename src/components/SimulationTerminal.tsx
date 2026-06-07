@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLeague, simulateMatch } from "@/state/league";
+import { validateMatchup } from "@/lib/lineup";
+import type { MatchPayload } from "@/lib/match-payload";
 import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -14,7 +16,7 @@ interface Props {
   initialAway?: string;
   lockTeams?: boolean;
   defaultTempoIndex?: number;
-  onComplete?: (homeGoals: number, awayGoals: number, injured: { team: string; name: string }[]) => void;
+  onComplete?: (homeGoals: number, awayGoals: number, payload: MatchPayload) => void;
   fullscreen?: boolean;
   onExit?: () => void;
 }
@@ -28,7 +30,7 @@ export function SimulationTerminal({
   fullscreen = false,
   onExit,
 }: Props) {
-  const { state } = useLeague();
+  const { state, addYouthPlayer } = useLeague();
   const teams = state.teamOrder;
 
   const [home, setHome] = useState(initialHome ?? teams[0]);
@@ -48,8 +50,19 @@ export function SimulationTerminal({
 
   useEffect(() => () => { if (timerRef.current) window.clearInterval(timerRef.current); }, []);
 
+  const blocked = home === away;
+
+  // Matchday & lineup safety validation runs before a sim can be permitted.
+  const validation = useMemo(() => {
+    if (blocked) return null;
+    const ht = state.teams[home];
+    const at = state.teams[away];
+    if (!ht || !at) return null;
+    return validateMatchup(ht, at);
+  }, [state.teams, home, away, blocked]);
+
   function runSim() {
-    if (running || home === away) return;
+    if (running || blocked || (validation && !validation.ok)) return;
     setRunning(true);
     setScore(null);
     setLines([]);
@@ -66,12 +79,10 @@ export function SimulationTerminal({
         timerRef.current = null;
         setScore({ h: result.homeGoals, a: result.awayGoals });
         setRunning(false);
-        onComplete?.(result.homeGoals, result.awayGoals, result.injured);
+        onComplete?.(result.homeGoals, result.awayGoals, result.payload);
       }
     }, 45);
   }
-
-  const blocked = home === away;
 
   return (
     <div className={fullscreen ? "fixed inset-0 z-50 overflow-auto bg-background p-4 sm:p-6" : ""}>
@@ -96,6 +107,32 @@ export function SimulationTerminal({
       </div>
       {blocked && (
         <p className="mt-2 text-center text-sm text-destructive">Home and Away must differ.</p>
+      )}
+
+      {/* Lineup safety validation panel */}
+      {validation && !validation.ok && (
+        <div className="mt-4 rounded-lg border border-destructive bg-destructive/10 p-4">
+          <div className="mb-1 text-sm font-bold uppercase tracking-wide text-destructive">
+            ⛔ Lineup not match-ready
+          </div>
+          <ul className="space-y-1 text-xs text-destructive">
+            {validation.errors.map((e, i) => <li key={i}>• {e}</li>)}
+          </ul>
+          {validation.emergency && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {[home, away].map((tn) => {
+                const t = state.teams[tn];
+                const healthy = t.players.filter((p) => p.injuryWeeks === 0 && p.suspensionWeeks === 0).length;
+                if (healthy >= 9) return null;
+                return (
+                  <Button key={tn} size="sm" variant="secondary" onClick={() => addYouthPlayer(tn)}>
+                    + YOUTH CALL-UP FOR {tn.toUpperCase()}
+                  </Button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Sliders */}
@@ -134,7 +171,11 @@ export function SimulationTerminal({
           <div className="truncate text-left text-sm font-semibold sm:text-base">{away}</div>
         </div>
         <div className="mt-4 flex justify-center">
-          <Button onClick={runSim} disabled={running || blocked} className="px-8 font-semibold">
+          <Button
+            onClick={runSim}
+            disabled={running || blocked || (validation ? !validation.ok : false)}
+            className="px-8 font-semibold"
+          >
             {running ? "SIMULATING…" : "RUN MATCH"}
           </Button>
         </div>

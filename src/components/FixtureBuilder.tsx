@@ -16,10 +16,14 @@ export function FixtureBuilder({
   weeks,
   title,
   onSaved,
+  commit,
+  saveLabelOverride,
 }: {
   weeks: number[];
   title: string;
   onSaved?: () => void;
+  commit?: (entries: { week: number; home: string; away: string }[]) => void;
+  saveLabelOverride?: string;
 }) {
   const { state, addFixtures } = useLeague();
   const teams = state.teamOrder;
@@ -45,7 +49,9 @@ export function FixtureBuilder({
 
   function save() {
     if (drafts.length === 0) return;
-    addFixtures(drafts.map(({ week, home, away }) => ({ week, home, away })));
+    const entries = drafts.map(({ week, home, away }) => ({ week, home, away }));
+    if (commit) commit(entries);
+    else addFixtures(entries);
     setDrafts([]);
     onSaved?.();
   }
@@ -133,7 +139,7 @@ export function FixtureBuilder({
 
       <div className="mt-4 flex justify-end">
         <Button onClick={save} disabled={drafts.length === 0} className="px-6 font-semibold">
-          SAVE {drafts.length} FIXTURE{drafts.length === 1 ? "" : "S"}
+          {saveLabelOverride ?? `SAVE ${drafts.length} FIXTURE${drafts.length === 1 ? "" : "S"}`}
         </Button>
       </div>
     </div>
