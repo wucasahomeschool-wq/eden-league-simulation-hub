@@ -182,8 +182,14 @@ export function generateTradeProposals(state: LeagueState, maxProposals = 5): Tr
           // Affordability check.
           if (cashA > squadB.budgetM || cashB > squadA.budgetM) continue;
 
+          // Positional guardrails: block any deal that would leave either club
+          // unable to field a valid lineup.
+          if (!tradeKeepsRosterLegal(teamA, pA, pB)) continue;
+          if (!tradeKeepsRosterLegal(teamB, pB, pA)) continue;
+
           const deltaUA = tradeUtilityDelta(squadA, pA, pB, cashA - cashB);
           const deltaUB = tradeUtilityDelta(squadB, pB, pA, cashB - cashA);
+
 
           if (deltaUA > 0 && deltaUB > 0) {
             deals.push({
