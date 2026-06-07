@@ -38,6 +38,29 @@ function countPositions(players: LeaguePlayer[]) {
   return c;
 }
 
+// ---------------- Positional guardrails ----------------
+// Before any automated proposal is surfaced, verify the post-trade roster of
+// BOTH clubs would still be able to field a valid lineup. A legal roster keeps:
+//   • at least 1 active, uninjured Goalkeeper
+//   • at least 11 healthy (non-injured, non-suspended) players
+//   • the core tactical spine: >= 2 defenders, >= 2 midfielders, >= 1 attacker
+const isHealthy = (p: LeaguePlayer) => p.injuryWeeks === 0 && p.suspensionWeeks === 0;
+
+function isRosterLegal(players: LeaguePlayer[]): boolean {
+  const healthy = players.filter(isHealthy);
+  if (healthy.length < 11) return false;
+  const counts = countPositions(healthy);
+  return counts.GK >= 1 && counts.DEF >= 2 && counts.MID >= 2 && counts.ATT >= 1;
+}
+
+// Post-trade legality for a single club (sends `out`, receives `incoming`).
+function tradeKeepsRosterLegal(team: LeagueTeam, out: LeaguePlayer, incoming: LeaguePlayer): boolean {
+  const post = [...team.players.filter((p) => p !== out), incoming];
+  return isRosterLegal(post);
+}
+
+
+
 // ---------------- 2. Mathematical player valuation (V_p) ----------------
 export function calculatePlayerValue(p: LeaguePlayer): number {
   let keyAvg: number;
