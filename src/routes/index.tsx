@@ -29,6 +29,7 @@ export const Route = createFileRoute("/")({
 const SUITES = [
   { name: "Simulation Terminal", render: () => <SimulationTerminal /> },
   { name: "Season Schedule", render: () => <ScheduleSuite /> },
+  { name: "Match Scheduling", render: () => <MatchSchedulingSuite /> },
   { name: "League Standings", render: () => <StandingsSuite /> },
   { name: "Playoffs", render: () => <PlayoffsSuite /> },
   { name: "Trades", render: () => <TradesSuite /> },
