@@ -60,36 +60,37 @@ export function MatchSchedulingSuite() {
       </p>
     </div>
   );
+}
 
-  function StandingsReference() {
-    return (
-      <div className="overflow-x-auto rounded-xl border bg-card">
-        <div className="border-b px-4 py-2.5 text-sm font-bold uppercase tracking-wide">
-          Standings Reference
-        </div>
-        <table className="w-full border-collapse text-xs">
-          <thead>
-            <tr className="border-b bg-panel text-left font-bold uppercase text-muted-foreground">
-              <th className="px-3 py-2">#</th>
-              <th className="px-3 py-2">Team</th>
-              <th className="px-3 py-2 text-center">PTS</th>
-              <th className="px-3 py-2 text-center">GD</th>
-            </tr>
-          </thead>
-          <tbody>
-            {standings.map((row) => (
-              <tr key={row.team} className="border-b last:border-0 odd:bg-muted/40">
-                <td className="px-3 py-1.5 text-center font-mono tabular-nums">{row.rank}</td>
-                <td className="px-3 py-1.5 font-medium">{row.team}</td>
-                <td className="px-3 py-1.5 text-center font-mono font-bold tabular-nums text-primary">{row.pts}</td>
-                <td className="px-3 py-1.5 text-center tabular-nums">{row.gd > 0 ? `+${row.gd}` : row.gd}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+function StandingsReference() {
+  const { standings } = useLeague();
+  return (
+    <div className="overflow-x-auto rounded-xl border bg-card">
+      <div className="border-b px-4 py-2.5 text-sm font-bold uppercase tracking-wide">
+        Standings Reference
       </div>
-    );
-  }
+      <table className="w-full border-collapse text-xs">
+        <thead>
+          <tr className="border-b bg-panel text-left font-bold uppercase text-muted-foreground">
+            <th className="px-3 py-2">#</th>
+            <th className="px-3 py-2">Team</th>
+            <th className="px-3 py-2 text-center">PTS</th>
+            <th className="px-3 py-2 text-center">GD</th>
+          </tr>
+        </thead>
+        <tbody>
+          {standings.map((row) => (
+            <tr key={row.team} className="border-b last:border-0 odd:bg-muted/40">
+              <td className="px-3 py-1.5 text-center font-mono tabular-nums">{row.rank}</td>
+              <td className="px-3 py-1.5 font-medium">{row.team}</td>
+              <td className="px-3 py-1.5 text-center font-mono font-bold tabular-nums text-primary">{row.pts}</td>
+              <td className="px-3 py-1.5 text-center tabular-nums">{row.gd > 0 ? `+${row.gd}` : row.gd}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 function Banner({ title, body }: { title: string; body: string }) {
