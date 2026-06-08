@@ -753,8 +753,6 @@ function moveTrade(
   if (movingFromB.length > 0 && movingFromA.length === 0) applyTeamEvent(bTeam, "asset_depletion");
 
   // Player career promotion / demotion based on destination club budget.
-  const promoEvent = (from: number, to: number): TeamEvent | null => null; // placeholder unused
-  void promoEvent;
   for (const moved of movingFromA) {
     const player = bTeam.players.find((p) => p.name === moved.name);
     if (!player) continue;
