@@ -100,6 +100,33 @@ function buildSquad(team: LeagueTeam): Squad {
   };
 }
 
+type PosKey = "GK" | "DEF" | "MID" | "ATT";
+function groupOf(position: string): PosKey {
+  if (position === "GK") return "GK";
+  if (DEF_POS.includes(position)) return "DEF";
+  if (ATT_POS.includes(position)) return "ATT";
+  return "MID";
+}
+
+// Minimum healthy depth a club wants per position group before it is "stocked".
+const REQUIRED: Record<PosKey, number> = { GK: 2, DEF: 4, MID: 4, ATT: 3 };
+// A group this far above requirement is "stacked" — the club won't add more.
+const SURPLUS: Record<PosKey, number> = { GK: 3, DEF: 6, MID: 6, ATT: 5 };
+
+function groupCounts(squad: Squad): Record<PosKey, number> {
+  const c: Record<PosKey, number> = { GK: 0, DEF: 0, MID: 0, ATT: 0 };
+  for (const p of [...squad.active, ...squad.bench]) c[groupOf(p.position)]++;
+  return c;
+}
+
+function isShortage(squad: Squad, g: PosKey): boolean {
+  return groupCounts(squad)[g] < REQUIRED[g];
+}
+function isSurplus(squad: Squad, g: PosKey): boolean {
+  const counts = groupCounts(squad);
+  return counts[g] >= SURPLUS[g];
+}
+
 function squadUtility(squad: Squad): number {
   const activeRating = sum(squad.active.map((p) => p.rating));
   const benchRating = sum(squad.bench.map((p) => p.rating)) * 0.4;
@@ -123,7 +150,25 @@ function tradeUtilityDelta(
   if (active.length < 9) active.push(playerIn);
   else bench.push(playerIn);
   const after: Squad = { active, bench, budgetM: squad.budgetM + cashChange };
-  return squadUtility(after) - squadUtility(squad);
+  let delta = squadUtility(after) - squadUtility(squad);
+
+  // ---- Positional Trade Urgency ----
+  const inGroup = groupOf(playerIn.position);
+  const outGroup = groupOf(playerOut.position);
+  // Stacking an already-stocked position the club doesn't need: flat reject.
+  if (isSurplus(squad, inGroup) && !isShortage(squad, inGroup) && inGroup !== outGroup) {
+    return -100;
+  }
+  // Active shortage at the incoming player's position: scale the weighting up
+  // by 150% so the club is willing to overpay for a missing piece.
+  if (isShortage(squad, inGroup) && inGroup !== outGroup) {
+    delta *= 1.5;
+  }
+  // Selling out of a position the club is already short on: penalize.
+  if (isShortage(squad, outGroup) && inGroup !== outGroup) {
+    delta -= 5;
+  }
+  return delta;
 }
 
 // ---------------- 4. The negotiation loop (global market scan) ----------------
