@@ -828,13 +828,13 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
           };
           // Comeback: returned to availability this week.
           if (wasOut && np.injuryWeeks === 0 && np.suspensionWeeks === 0) {
-            np = { ...np, morale: clampMorale01(np.morale + 15) };
+            np = { ...np, morale: clampMorale(np.morale + 15) };
           }
         }
         // Weekly selection / bench morale (player micro-events skip exempt clubs).
         if (!exempt && np.injuryWeeks === 0 && np.suspensionWeeks === 0) {
           const delta = inLineup.has(np.name) ? 5 : -10;
-          np = { ...np, morale: clampMorale01(np.morale + delta) };
+          np = { ...np, morale: clampMorale(np.morale + delta) };
         }
         return np;
       });
