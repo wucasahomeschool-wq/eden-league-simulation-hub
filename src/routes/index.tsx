@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { LeagueProvider } from "@/state/league";
+import { LeagueProvider, useLeague } from "@/state/league";
 import { SimulationTerminal } from "@/components/SimulationTerminal";
 import { ScheduleSuite } from "@/components/ScheduleSuite";
 import { StandingsSuite } from "@/components/StandingsSuite";
@@ -8,6 +8,7 @@ import { TeamEditorSuite } from "@/components/TeamEditorSuite";
 import { PlayoffsSuite } from "@/components/PlayoffsSuite";
 import { MatchSchedulingSuite } from "@/components/MatchSchedulingSuite";
 import { TradesSuite } from "@/components/TradesSuite";
+import { Button } from "@/components/ui/button";
 import edenLogo from "@/assets/eden-league-logo.png.asset.json";
 
 export const Route = createFileRoute("/")({
