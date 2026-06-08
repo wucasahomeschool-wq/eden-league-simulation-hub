@@ -689,11 +689,11 @@ function autoPromote(team: LeagueTeam, incoming: LeaguePlayer[]): LeagueTeam {
   const lineup = [...team.lineup];
   for (const inc of incoming) {
     const g = positionGroup(inc.position);
+    if (lineup.includes(inc.name)) continue; // already starting
     let worstIdx = -1;
     let worstRating = Infinity;
     slots.forEach((s, i) => {
       if (s.group !== g) return;
-      if (lineup[i] === inc.name) { worstIdx = -2; return; } // already starting
       const cur = team.players.find((p) => p.name === lineup[i]);
       const r = cur ? cur.rating : -1;
       if (r < worstRating) { worstRating = r; worstIdx = i; }
