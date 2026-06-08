@@ -157,27 +157,6 @@ export function ScheduleSuite() {
           setManualFixture(null);
         }}
       />
-
-      {/* Rollback confirm */}
-      <Dialog open={confirmRollback} onOpenChange={setConfirmRollback}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Rollback to start of Week {state.currentWeek}?</DialogTitle>
-            <DialogDescription>
-              This restores all league data — results, standings, statistics, injuries and
-              suspensions — to the moment the current week began. Any results entered this week will
-              be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmRollback(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => { rollbackWeek(); setConfirmRollback(false); }}>
-              Rollback Week
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
   );
 }
 
