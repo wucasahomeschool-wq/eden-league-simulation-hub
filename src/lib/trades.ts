@@ -195,7 +195,13 @@ function sample<T>(arr: T[], k: number): T[] {
   return out;
 }
 
-export function generateTradeProposals(state: LeagueState, maxProposals = 5): TradeProposal[] {
+// Minimum combined utility gain for a deal to be surfaced to the user. Quality,
+// not quantity: any deal clearing this bar is sent to the Trade Suite.
+export const UTILITY_THRESHOLD = 4.0;
+// Hard safety cap so a pathological week can't flood the desk.
+const MAX_SURFACED = 25;
+
+export function generateTradeProposals(state: LeagueState): TradeProposal[] {
   const teams = state.teamOrder.map((name) => state.teams[name]);
   const squads = new Map<string, Squad>();
   for (const t of teams) squads.set(t.name, buildSquad(t));
