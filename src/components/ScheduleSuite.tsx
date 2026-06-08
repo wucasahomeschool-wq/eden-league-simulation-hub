@@ -157,6 +157,7 @@ export function ScheduleSuite() {
           setManualFixture(null);
         }}
       />
+    </div>
   );
 }
 
