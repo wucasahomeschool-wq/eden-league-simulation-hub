@@ -10,10 +10,9 @@ import {
 import { Input } from "@/components/ui/input";
 
 export function ScheduleSuite() {
-  const { state, setResult, resetMatchResult, rollbackWeek, canRollback } = useLeague();
+  const { state, setResult } = useLeague();
   const [simFixture, setSimFixture] = useState<FixtureEntry | null>(null);
   const [manualFixture, setManualFixture] = useState<FixtureEntry | null>(null);
-  const [confirmRollback, setConfirmRollback] = useState(false);
 
   const weeks = useMemo(() => {
     const map = new Map<number, FixtureEntry[]>();
