@@ -9,8 +9,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 
+const NONE = "__none__";
+
 export function TradesSuite() {
-  const { state, executeTrade, declineTrade, refreshTradeProposals } = useLeague();
+  const { state, executeTrade, executeManualTrade, declineTrade, refreshTradeProposals } = useLeague();
   const inWindow = state.currentWeek <= TRANSFER_WINDOW_LAST_WEEK;
 
   return (
@@ -21,8 +23,8 @@ export function TradesSuite() {
           <div>
             <h2 className="text-base font-extrabold uppercase tracking-wide">Automatic Trade Desk</h2>
             <p className="text-xs text-muted-foreground">
-              The market engine scans all 24 clubs at the end of each match week and surfaces the
-              top {5} most mutually beneficial deals.{" "}
+              The market engine scans all 24 clubs each match week and surfaces every deal whose
+              combined utility clears the quality threshold — not a fixed count.{" "}
               {inWindow ? "Transfer window OPEN." : `Window closed (reopens next season, runs through Week ${TRANSFER_WINDOW_LAST_WEEK}).`}
             </p>
           </div>
@@ -33,7 +35,8 @@ export function TradesSuite() {
 
         {state.tradeProposals.length === 0 ? (
           <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
-            No active proposals. Deals are generated automatically each week, or run the engine now.
+            No proposals clear the utility threshold right now. Deals are generated automatically each
+            week, or run the engine now.
           </div>
         ) : (
           <div className="space-y-3">
@@ -52,7 +55,7 @@ export function TradesSuite() {
       {/* MANUAL SECTION */}
       <section>
         <h2 className="mb-3 text-base font-extrabold uppercase tracking-wide">Manual Trade Builder</h2>
-        <ManualTrade teams={state.teamOrder.map((n) => state.teams[n])} onSubmit={executeTrade} />
+        <ManualTrade teams={state.teamOrder.map((n) => state.teams[n])} onSubmit={executeManualTrade} />
       </section>
     </div>
   );
@@ -94,59 +97,56 @@ function ProposalCard({
 function ManualTrade({
   teams, onSubmit,
 }: {
-  teams: LeagueTeam[]; onSubmit: (t: TradeProposal) => void;
+  teams: LeagueTeam[];
+  onSubmit: (teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashA: number, cashB: number) => void;
 }) {
   const [teamAName, setTeamAName] = useState(teams[0].name);
   const [teamBName, setTeamBName] = useState(teams[1].name);
   const teamA = teams.find((t) => t.name === teamAName) ?? teams[0];
   const teamB = teams.find((t) => t.name === teamBName) ?? teams[1];
 
-  const [aPlayer, setAPlayer] = useState(teamA.players[0]?.name ?? "");
-  const [bPlayer, setBPlayer] = useState(teamB.players[0]?.name ?? "");
+  const [aPlayers, setAPlayers] = useState<string[]>([]);
+  const [bPlayers, setBPlayers] = useState<string[]>([]);
   const [cashAReceives, setCashAReceives] = useState("0");
   const [cashBReceives, setCashBReceives] = useState("0");
 
-  // Keep player selections valid when team changes.
-  const aNames = useMemo(() => teamA.players.map((p) => p.name), [teamA]);
-  const bNames = useMemo(() => teamB.players.map((p) => p.name), [teamB]);
-  const validA = aNames.includes(aPlayer) ? aPlayer : aNames[0] ?? "";
-  const validB = bNames.includes(bPlayer) ? bPlayer : bNames[0] ?? "";
+  // Reset selections when a club changes so stale names don't linger.
+  const aRosterKey = useMemo(() => teamA.players.map((p) => p.name).join("|"), [teamA]);
+  const bRosterKey = useMemo(() => teamB.players.map((p) => p.name).join("|"), [teamB]);
+  const validA = useMemo(() => aPlayers.filter((n) => teamA.players.some((p) => p.name === n)), [aPlayers, aRosterKey]);
+  const validB = useMemo(() => bPlayers.filter((n) => teamB.players.some((p) => p.name === n)), [bPlayers, bRosterKey]);
 
   const sameTeam = teamAName === teamBName;
-  const aValue = teamA.players.find((p) => p.name === validA);
-  const bValue = teamB.players.find((p) => p.name === validB);
+  const aValueTotal = validA.reduce((s, n) => s + (calculatePlayerValue(teamA.players.find((p) => p.name === n)!) || 0), 0);
+  const bValueTotal = validB.reduce((s, n) => s + (calculatePlayerValue(teamB.players.find((p) => p.name === n)!) || 0), 0);
+  const nothing = validA.length === 0 && validB.length === 0;
 
   function submit() {
-    if (sameTeam || !validA || !validB) return;
-    onSubmit({
-      id: `manual-${Date.now()}`,
-      teamA: teamAName,
-      teamB: teamBName,
-      aSends: validA,
-      bSends: validB,
-      cashAReceives: Math.max(0, parseFloat(cashAReceives) || 0),
-      cashBReceives: Math.max(0, parseFloat(cashBReceives) || 0),
-      deltaUA: 0,
-      deltaUB: 0,
-    });
+    if (sameTeam || nothing) return;
+    onSubmit(
+      teamAName, teamBName, validA, validB,
+      Math.max(0, parseFloat(cashAReceives) || 0),
+      Math.max(0, parseFloat(cashBReceives) || 0),
+    );
+    setAPlayers([]); setBPlayers([]); setCashAReceives("0"); setCashBReceives("0");
   }
 
   return (
     <div className="rounded-xl border bg-card p-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <TeamPicker label="Team A" value={teamAName} teams={teams} onChange={setTeamAName} />
-          <PlayerPicker label="A sends" value={validA} names={aNames} onChange={setAPlayer} />
-          {aValue && <p className="text-[11px] text-muted-foreground">Est. value: <span className="font-mono">${calculatePlayerValue(aValue)}M</span></p>}
+          <TeamPicker label="Team A" value={teamAName} teams={teams} onChange={(v) => { setTeamAName(v); setAPlayers([]); }} />
+          <CascadingPlayers label="A sends" team={teamA} value={validA} onChange={setAPlayers} />
+          <p className="text-[11px] text-muted-foreground">Total value out: <span className="font-mono">${aValueTotal.toFixed(1)}M</span></p>
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cash A receives ($M)</label>
             <Input type="number" min={0} step="0.1" value={cashAReceives} onChange={(e) => setCashAReceives(e.target.value)} className="bg-card" />
           </div>
         </div>
         <div className="space-y-2">
-          <TeamPicker label="Team B" value={teamBName} teams={teams} onChange={setTeamBName} />
-          <PlayerPicker label="B sends" value={validB} names={bNames} onChange={setBPlayer} />
-          {bValue && <p className="text-[11px] text-muted-foreground">Est. value: <span className="font-mono">${calculatePlayerValue(bValue)}M</span></p>}
+          <TeamPicker label="Team B" value={teamBName} teams={teams} onChange={(v) => { setTeamBName(v); setBPlayers([]); }} />
+          <CascadingPlayers label="B sends" team={teamB} value={validB} onChange={setBPlayers} />
+          <p className="text-[11px] text-muted-foreground">Total value out: <span className="font-mono">${bValueTotal.toFixed(1)}M</span></p>
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cash B receives ($M)</label>
             <Input type="number" min={0} step="0.1" value={cashBReceives} onChange={(e) => setCashBReceives(e.target.value)} className="bg-card" />
@@ -155,7 +155,7 @@ function ManualTrade({
       </div>
       {sameTeam && <p className="mt-2 text-xs text-destructive">Pick two different clubs.</p>}
       <div className="mt-4 flex justify-end">
-        <Button onClick={submit} disabled={sameTeam || !validA || !validB} className="px-6 font-semibold">
+        <Button onClick={submit} disabled={sameTeam || nothing} className="px-6 font-semibold">
           INITIATE TRADE
         </Button>
       </div>
@@ -181,20 +181,47 @@ function TeamPicker({
   );
 }
 
-function PlayerPicker({
-  label, value, names, onChange,
+// Cascading player picker: starts with a single "No player" dropdown. Selecting
+// a real player reveals another dropdown (defaulting to "No player") containing
+// the remaining roster, and so on.
+function CascadingPlayers({
+  label, team, value, onChange,
 }: {
-  label: string; value: string; names: string[]; onChange: (v: string) => void;
+  label: string; team: LeagueTeam; value: string[]; onChange: (v: string[]) => void;
 }) {
+  const rows = [...value, ""]; // trailing empty slot for the next pick
+
+  function setAt(i: number, name: string) {
+    const next = [...value];
+    if (name === "") next.splice(i, 1);
+    else next[i] = name;
+    onChange(next.filter(Boolean));
+  }
+
   return (
     <div>
       <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</label>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="w-full bg-card"><SelectValue /></SelectTrigger>
-        <SelectContent>
-          {names.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
-        </SelectContent>
-      </Select>
+      <div className="space-y-1.5">
+        {rows.map((cur, i) => {
+          const taken = new Set(value.filter((_, j) => j !== i));
+          const options = team.players.filter((p) => !taken.has(p.name));
+          return (
+            <Select
+              key={i}
+              value={cur || NONE}
+              onValueChange={(v) => setAt(i, v === NONE ? "" : v)}
+            >
+              <SelectTrigger className="w-full bg-card"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>No player</SelectItem>
+                {options.map((p) => (
+                  <SelectItem key={p.name} value={p.name}>{p.name} ({p.position})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -1,9 +1,11 @@
 // Matchday & Lineup Safety Validation Layer.
-// Runs immediately before a match simulation is permitted. A legal lineup is
-// exactly 9 healthy, non-suspended players in the starting group, with no
-// injured/suspended player left in the starting nine. If a team's total pool of
-// healthy players drops below 9, an emergency youth fill-in is required.
-import { isPlayerOut, type LeagueTeam } from "@/state/league";
+// A legal lineup fills every formation slot with a distinct, healthy player
+// whose position group matches the slot (GK / DF / MF / ST). The default
+// formation requires exactly 1 GK, 3 DF, 3 MF and 2 ST. A sim is blocked until
+// both clubs field a complete, valid 9-man tactical distribution.
+import {
+  isPlayerOut, buildLineupSlots, positionGroup, type LeagueTeam,
+} from "@/state/league";
 
 export interface LineupValidation {
   ok: boolean;
@@ -17,28 +19,47 @@ export interface LineupValidation {
 export function validateLineup(team: LeagueTeam): LineupValidation {
   const errors: string[] = [];
   const healthy = team.players.filter((p) => !isPlayerOut(p));
-  const healthyStarters = team.players.filter((p) => p.starter && !isPlayerOut(p)).length;
-  const outStarters = team.players.filter((p) => p.starter && isPlayerOut(p)).length;
   const healthyTotal = healthy.length;
-
   const emergency = healthyTotal < 9;
+
   if (emergency) {
     errors.push(
       `${team.name} has only ${healthyTotal} healthy player${healthyTotal === 1 ? "" : "s"} — an injury crisis. Add blank or youth players to reach 9 before the match can be played.`
     );
   }
 
-  if (outStarters > 0) {
-    errors.push(
-      `${outStarters} injured/suspended player${outStarters === 1 ? " is" : "s are"} still flagged as a starter for ${team.name}. Remove them from the starting nine.`
-    );
+  const slots = buildLineupSlots(team.formation);
+  const lineup = team.lineup;
+  const filled = lineup.filter(Boolean);
+  const distinct = new Set(filled);
+
+  if (filled.length < slots.length) {
+    errors.push(`${team.name}: ${slots.length - filled.length} empty lineup slot(s). Assign a player to every position.`);
+  }
+  if (distinct.size < filled.length) {
+    errors.push(`${team.name}: the same player is used in more than one slot.`);
   }
 
-  if (!emergency && healthyStarters !== 9) {
-    errors.push(
-      `${team.name} must field exactly 9 healthy starters (currently ${healthyStarters}). Adjust the starting lineup in the Team Editor.`
-    );
-  }
+  let healthyStarters = 0;
+  let outStarters = 0;
+  slots.forEach((slot, i) => {
+    const name = lineup[i];
+    if (!name) return;
+    const player = team.players.find((p) => p.name === name);
+    if (!player) {
+      errors.push(`${team.name}: lineup references unknown player "${name}".`);
+      return;
+    }
+    if (isPlayerOut(player)) {
+      outStarters++;
+      errors.push(`${team.name}: ${player.name} is injured/suspended and cannot start. Replace them in the ${slot.label} slot.`);
+      return;
+    }
+    healthyStarters++;
+    if (positionGroup(player.position) !== slot.group) {
+      errors.push(`${team.name}: ${player.name} (${player.position}) does not fit the ${slot.group} slot ${slot.label}.`);
+    }
+  });
 
   return {
     ok: errors.length === 0,

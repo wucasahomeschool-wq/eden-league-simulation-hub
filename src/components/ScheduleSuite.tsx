@@ -10,10 +10,9 @@ import {
 import { Input } from "@/components/ui/input";
 
 export function ScheduleSuite() {
-  const { state, setResult, resetMatchResult, rollbackWeek, canRollback } = useLeague();
+  const { state, setResult } = useLeague();
   const [simFixture, setSimFixture] = useState<FixtureEntry | null>(null);
   const [manualFixture, setManualFixture] = useState<FixtureEntry | null>(null);
-  const [confirmRollback, setConfirmRollback] = useState(false);
 
   const weeks = useMemo(() => {
     const map = new Map<number, FixtureEntry[]>();
@@ -45,14 +44,9 @@ export function ScheduleSuite() {
               : "Final Four phase"}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={!canRollback}
-          onClick={() => setConfirmRollback(true)}
-        >
-          ROLLBACK WEEK
-        </Button>
+        <p className="text-xs text-muted-foreground">
+          Mistake? Use the <span className="font-semibold text-foreground">UNDO</span> button in the header.
+        </p>
       </div>
 
       {preSeason && (
@@ -112,12 +106,6 @@ export function ScheduleSuite() {
                           <span className="text-[10px] uppercase text-muted-foreground">
                             {r.method === "SIM" ? "Simulated" : "Manual entry"}
                           </span>
-                          <button
-                            onClick={() => resetMatchResult(fx.id)}
-                            className="text-[10px] font-semibold uppercase text-destructive hover:underline"
-                          >
-                            Reset result
-                          </button>
                         </div>
                       )}
                     </li>
@@ -169,26 +157,6 @@ export function ScheduleSuite() {
           setManualFixture(null);
         }}
       />
-
-      {/* Rollback confirm */}
-      <Dialog open={confirmRollback} onOpenChange={setConfirmRollback}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Rollback to start of Week {state.currentWeek}?</DialogTitle>
-            <DialogDescription>
-              This restores all league data — results, standings, statistics, injuries and
-              suspensions — to the moment the current week began. Any results entered this week will
-              be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmRollback(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => { rollbackWeek(); setConfirmRollback(false); }}>
-              Rollback Week
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
