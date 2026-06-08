@@ -87,3 +87,19 @@ function Hub() {
     </div>
   );
 }
+
+function UndoButton() {
+  const { undo, canUndo } = useLeague();
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={undo}
+      disabled={!canUndo}
+      title="Undo the last action across any suite"
+      className="font-semibold"
+    >
+      ↶ UNDO
+    </Button>
+  );
+}
