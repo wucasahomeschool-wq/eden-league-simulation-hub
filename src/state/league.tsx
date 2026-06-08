@@ -815,6 +815,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     for (const name of next.teamOrder) {
       const t = next.teams[name];
       const inLineup = new Set(t.lineup.filter(Boolean));
+      const exempt = EXEMPT_TEAMS.has(name);
       const players = t.players.map((p) => {
         let np = p;
         if (!protectedKeys.has(`${name}::${p.name}`) && (p.injuryWeeks > 0 || p.suspensionWeeks > 0)) {
@@ -826,10 +827,14 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
           };
           // Comeback: returned to availability this week.
           if (wasOut && np.injuryWeeks === 0 && np.suspensionWeeks === 0) {
-            np = { ...np, morale: Math.max(0, Math.min(100, np.morale + 15)) };
+            np = { ...np, morale: clampMorale01(np.morale + 15) };
           }
         }
-        // Weekly selection / bench morale (non-exempt handled by team identity).
+        // Weekly selection / bench morale (player micro-events skip exempt clubs).
+        if (!exempt && np.injuryWeeks === 0 && np.suspensionWeeks === 0) {
+          const delta = inLineup.has(np.name) ? 5 : -10;
+          np = { ...np, morale: clampMorale01(np.morale + delta) };
+        }
         return np;
       });
       teams[name] = { ...t, players };
