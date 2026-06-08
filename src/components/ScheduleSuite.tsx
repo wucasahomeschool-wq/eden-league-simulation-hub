@@ -106,12 +106,6 @@ export function ScheduleSuite() {
                           <span className="text-[10px] uppercase text-muted-foreground">
                             {r.method === "SIM" ? "Simulated" : "Manual entry"}
                           </span>
-                          <button
-                            onClick={() => resetMatchResult(fx.id)}
-                            className="text-[10px] font-semibold uppercase text-destructive hover:underline"
-                          >
-                            Reset result
-                          </button>
                         </div>
                       )}
                     </li>
