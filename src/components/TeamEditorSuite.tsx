@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import {
-  useLeague, ATTR_KEYS, isPlayerOut, SEASON_ENDING_WEEKS, type AttrKey,
+  useLeague, ATTR_KEYS, isPlayerOut, SEASON_ENDING_WEEKS, positionGroup,
+  buildLineupSlots, type AttrKey,
 } from "@/state/league";
+import { moraleLabel } from "@/lib/morale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -27,6 +29,13 @@ const NUM_COLS: { key: AttrKey; label: string }[] = [
   { key: "AER", label: "AER" },
 ];
 
+const GROUP_COLOR: Record<string, string> = {
+  GK: "bg-amber-500/15 border-amber-500/40",
+  DF: "bg-sky-500/15 border-sky-500/40",
+  MF: "bg-emerald-500/15 border-emerald-500/40",
+  ST: "bg-rose-500/15 border-rose-500/40",
+};
+
 function weeksLabel(weeks: number): string {
   if (weeks >= SEASON_ENDING_WEEKS) return "Season";
   return `${weeks} wk`;
@@ -34,25 +43,36 @@ function weeksLabel(weeks: number): string {
 
 export function TeamEditorSuite() {
   const {
-    state, updateBudget, updatePlayer, toggleStarter,
+    state, updateBudget, updatePlayer,
     setInjuryWeeks, setSuspensionWeeks, addPlayer, removePlayer, renameTeam,
+    setLineupSlot, setFormation, autoFillLineup,
   } = useLeague();
   const [team, setTeam] = useState(state.teamOrder[0]);
   const [nameDraft, setNameDraft] = useState(team);
+  const [formationDraft, setFormationDraft] = useState("3-3-2");
 
-  // Keep selection valid if teams change; sync name draft to selection.
   useEffect(() => {
     if (!state.teams[team]) setTeam(state.teamOrder[0]);
   }, [state.teams, state.teamOrder, team]);
   useEffect(() => { setNameDraft(team); }, [team]);
+  useEffect(() => {
+    if (state.teams[team]) setFormationDraft(state.teams[team].formation);
+  }, [team, state.teams]);
 
   const t = state.teams[team];
   if (!t) return null;
 
-  const starterCount = t.players.filter((p) => p.starter && !isPlayerOut(p)).length;
+  const slots = buildLineupSlots(t.formation);
+  const starterCount = t.lineup.filter((n) => {
+    const p = t.players.find((x) => x.name === n);
+    return p && !isPlayerOut(p);
+  }).length;
   const reserves = t.players
     .map((p, idx) => ({ p, idx }))
     .filter(({ p }) => isPlayerOut(p));
+  const ml = moraleLabel(t.morale);
+  const moraleTone =
+    ml.tone === "high" ? "text-success" : ml.tone === "low" ? "text-destructive" : "text-foreground";
 
   function saveName() {
     const next = nameDraft.trim();
@@ -104,9 +124,47 @@ export function TeamEditorSuite() {
             className="h-9 w-40 rounded-md border bg-card px-3 font-mono text-sm font-semibold"
           />
         </div>
-        <div className="ml-auto text-xs text-muted-foreground">
-          Tactical style: <span className="font-semibold text-foreground">{t.tactical_style}</span>
-          {" · "}Active starters: <span className={starterCount === 9 ? "font-semibold text-success" : "font-semibold text-destructive"}>{starterCount}/9</span>
+        <div className="ml-auto text-right text-xs text-muted-foreground">
+          <div>Tactical style: <span className="font-semibold text-foreground">{t.tactical_style}</span></div>
+          <div>Team Morale: <span className={`font-semibold ${moraleTone}`}>{t.morale.toFixed(0)}% · {ml.text}</span></div>
+          <div>Active starters: <span className={starterCount === slots.length ? "font-semibold text-success" : "font-semibold text-destructive"}>{starterCount}/{slots.length}</span></div>
+        </div>
+      </div>
+
+      {/* Formation pitch */}
+      <div className="mb-6 rounded-xl border bg-panel/40 p-4">
+        <div className="mb-3 flex flex-wrap items-end gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Formation (DEF-MID-ATT, must total 8 outfielders)
+            </label>
+            <div className="flex gap-2">
+              <Input
+                value={formationDraft}
+                onChange={(e) => setFormationDraft(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && setFormation(team, formationDraft)}
+                placeholder="3-3-2"
+                className="h-9 w-28 bg-card font-mono"
+              />
+              <Button size="sm" variant="secondary" onClick={() => setFormation(team, formationDraft)}>
+                APPLY
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => autoFillLineup(team)}>
+                AUTO-FILL
+              </Button>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            A simulation requires a valid 9-man distribution: 1 GK, 3 DF, 3 MF, 2 ST. Each slot only
+            accepts a player from the matching position group.
+          </p>
+        </div>
+
+        <div className="rounded-lg bg-[oklch(0.93_0.04_150)] p-4">
+          <PitchRow slots={slots} group="ST" team={team} t={t} setLineupSlot={setLineupSlot} />
+          <PitchRow slots={slots} group="MF" team={team} t={t} setLineupSlot={setLineupSlot} />
+          <PitchRow slots={slots} group="DF" team={team} t={t} setLineupSlot={setLineupSlot} />
+          <PitchRow slots={slots} group="GK" team={team} t={t} setLineupSlot={setLineupSlot} />
         </div>
       </div>
 
@@ -114,9 +172,10 @@ export function TeamEditorSuite() {
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="border-b bg-panel text-left font-bold uppercase tracking-wide text-muted-foreground">
-              <th className="px-2 py-2 text-center">START</th>
               <th className="px-2 py-2 text-left">PLAYER</th>
               <th className="px-2 py-2 text-center">POS</th>
+              <th className="px-1.5 py-2 text-center">AGE</th>
+              <th className="px-1.5 py-2 text-center">MOR</th>
               {NUM_COLS.map((c) => <th key={c.key} className="px-1.5 py-2 text-center">{c.label}</th>)}
               <th className="px-2 py-2 text-center">HEALTH</th>
               <th className="px-1.5 py-2 text-center">INJ</th>
@@ -132,14 +191,6 @@ export function TeamEditorSuite() {
                   key={idx}
                   className={`border-b last:border-0 ${out ? "bg-destructive/10" : p.starter ? "bg-starter" : ""}`}
                 >
-                  <td className="px-2 py-1 text-center">
-                    <input
-                      type="checkbox"
-                      checked={p.starter}
-                      onChange={() => toggleStarter(team, idx)}
-                      className="h-4 w-4 accent-[var(--color-success)]"
-                    />
-                  </td>
                   <td className="px-1 py-1">
                     <input
                       value={p.name}
@@ -153,6 +204,19 @@ export function TeamEditorSuite() {
                       onChange={(e) => updatePlayer(team, idx, { position: e.target.value })}
                       className="w-12 rounded border border-transparent bg-transparent px-1 py-0.5 text-center uppercase hover:border-border focus:border-ring focus:bg-card focus:outline-none"
                     />
+                  </td>
+                  <td className="px-0.5 py-1 text-center">
+                    <input
+                      type="number"
+                      min={15}
+                      max={45}
+                      value={p.age}
+                      onChange={(e) => updatePlayer(team, idx, { age: parseInt(e.target.value) || 0 })}
+                      className="w-11 rounded border border-transparent bg-transparent px-1 py-0.5 text-center tabular-nums hover:border-border focus:border-ring focus:bg-card focus:outline-none"
+                    />
+                  </td>
+                  <td className="px-0.5 py-1 text-center">
+                    <span className="font-mono tabular-nums text-muted-foreground">{p.morale.toFixed(0)}</span>
                   </td>
                   {NUM_COLS.map((c) =>
                     c.key === "rating" ? (
@@ -225,9 +289,9 @@ export function TeamEditorSuite() {
           + ADD BLANK PLAYER
         </Button>
         <p className="text-xs text-muted-foreground">
-          Green rows = active matchday lineup. Red rows are on the injured/suspended reserve and are
-          excluded from the simulation. INJ / SUS are weeks remaining (set manually anytime).
-          OVR is auto-calculated from the attributes (weighted by position) and cannot be edited directly.
+          Assign your starting nine via the pitch above. AGE is editable (auto-seeded from a
+          physical/mental profile and used by the offseason aging engine). MOR is rolling player
+          morale. OVR is auto-calculated from attributes by position.
         </p>
       </div>
 
@@ -255,6 +319,49 @@ export function TeamEditorSuite() {
           </ul>
         )}
       </div>
+    </div>
+  );
+}
+
+function PitchRow({
+  slots, group, team, t, setLineupSlot,
+}: {
+  slots: { group: string; label: string }[];
+  group: string;
+  team: string;
+  t: { players: { name: string; position: string }[]; lineup: string[] };
+  setLineupSlot: (team: string, slot: number, name: string) => void;
+}) {
+  const indices = slots
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => s.group === group);
+  if (!indices.length) return null;
+
+  return (
+    <div className="mb-3 flex flex-wrap justify-center gap-3 last:mb-0">
+      {indices.map(({ s, i }) => {
+        const current = t.lineup[i] ?? "";
+        const eligible = t.players.filter((p) => positionGroup(p.position) === group);
+        return (
+          <div key={i} className={`w-40 rounded-lg border p-1.5 ${GROUP_COLOR[group] ?? "bg-card"}`}>
+            <div className="mb-1 text-center text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              {s.label}
+            </div>
+            <Select
+              value={current || "__none__"}
+              onValueChange={(v) => setLineupSlot(team, i, v === "__none__" ? "" : v)}
+            >
+              <SelectTrigger className="h-8 w-full bg-card text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">— empty —</SelectItem>
+                {eligible.map((p) => (
+                  <SelectItem key={p.name} value={p.name}>{p.name} ({p.position})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        );
+      })}
     </div>
   );
 }
