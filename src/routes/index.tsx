@@ -48,11 +48,12 @@ function Hub() {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 border-b bg-card/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+        <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3">
+          <UndoButton />
           <button
             onClick={prev}
             aria-label="Previous suite"
-            className="select-none px-3 py-1 text-2xl font-bold text-muted-foreground transition-colors hover:text-primary"
+            className="ml-auto select-none px-3 py-1 text-2xl font-bold text-muted-foreground transition-colors hover:text-primary"
           >
             ‹
           </button>
@@ -70,10 +71,11 @@ function Hub() {
           <button
             onClick={next}
             aria-label="Next suite"
-            className="select-none px-3 py-1 text-2xl font-bold text-muted-foreground transition-colors hover:text-primary"
+            className="mr-auto select-none px-3 py-1 text-2xl font-bold text-muted-foreground transition-colors hover:text-primary"
           >
             ›
           </button>
+          <div className="w-[72px]" aria-hidden />
         </div>
       </header>
 
