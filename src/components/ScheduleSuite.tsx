@@ -44,14 +44,9 @@ export function ScheduleSuite() {
               : "Final Four phase"}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={!canRollback}
-          onClick={() => setConfirmRollback(true)}
-        >
-          ROLLBACK WEEK
-        </Button>
+        <p className="text-xs text-muted-foreground">
+          Mistake? Use the <span className="font-semibold text-foreground">UNDO</span> button in the header.
+        </p>
       </div>
 
       {preSeason && (
