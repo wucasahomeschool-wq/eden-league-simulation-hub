@@ -260,7 +260,9 @@ export function generateTradeProposals(state: LeagueState): TradeProposal[] {
     }
   }
 
-  // Top filter: sort by combined utility gain, keep the most impactful.
+  // Surface every deal above the utility threshold, best first (capped).
   deals.sort((a, b) => b.deltaUA + b.deltaUB - (a.deltaUA + a.deltaUB));
-  return deals.slice(0, maxProposals);
+  return deals
+    .filter((d) => d.deltaUA + d.deltaUB >= UTILITY_THRESHOLD)
+    .slice(0, MAX_SURFACED);
 }
