@@ -9,7 +9,6 @@ import { computeStartingAge, ageOnePlayer } from "@/lib/aging";
 import { buildMatchPayload, type MatchPayload } from "@/lib/match-payload";
 import {
   applyTeamEvent, applyPlayerEvent, moraleScaledAttrs, MORALE_BASELINE,
-  type TeamEvent,
 } from "@/lib/morale";
 import {
   generateTradeProposals, parseBudget, formatBudget, type TradeProposal,
