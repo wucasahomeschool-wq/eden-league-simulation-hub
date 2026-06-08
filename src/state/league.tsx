@@ -5,13 +5,18 @@ import { INITIAL_BUDGETS } from "@/data/budgets";
 import { INITIAL_SCHEDULE, MANUAL_ONLY_TEAMS } from "@/data/schedule";
 import { buildEngineTeam, run_match } from "@/engine/engine";
 import { computeOverall } from "@/lib/ratings";
+import { computeStartingAge, ageOnePlayer } from "@/lib/aging";
 import { buildMatchPayload, type MatchPayload } from "@/lib/match-payload";
+import {
+  applyTeamEvent, applyPlayerEvent, moraleScaledAttrs, MORALE_BASELINE,
+  type TeamEvent,
+} from "@/lib/morale";
 import {
   generateTradeProposals, parseBudget, formatBudget, type TradeProposal,
 } from "@/lib/trades";
 
-const STORAGE_KEY = "eden_league_state_v4";
-const LEGACY_STORAGE_KEYS = ["eden_league_state_v3", "eden_league_state_v2", "eden_league_state_v1"];
+const STORAGE_KEY = "eden_league_state_v5";
+const LEGACY_STORAGE_KEYS = ["eden_league_state_v4", "eden_league_state_v3", "eden_league_state_v2", "eden_league_state_v1"];
 
 // Transfer window: the automatic trade engine only runs at the end of regular
 // season match weeks (1–12).
@@ -23,6 +28,9 @@ const YELLOW_WINDOW_WEEKS = 2; // 2 yellows within this many weeks => suspension
 const YELLOW_SUSPENSION = 1;
 const RED_SUSPENSION = 2;
 
+export const DEFAULT_FORMATION = "3-3-2";
+const MAX_UNDO = 60;
+
 export const ATTR_KEYS = [
   "rating", "FIN", "SHO", "PAS", "VIS", "DRI", "PAC", "STA",
   "DEF", "TAC", "POS_attr", "COM", "WR", "AGG", "STR", "AER",
@@ -33,6 +41,8 @@ export interface LeaguePlayer {
   name: string;
   position: string;
   starter: boolean;
+  age: number;
+  morale: number; // 0–100, baseline 50
   injuryWeeks: number; // 0 = healthy; SEASON_ENDING_WEEKS = out for season
   suspensionWeeks: number; // 0 = not suspended
   yellowLog: number[]; // weeks in which unpunished yellows were received
@@ -45,6 +55,9 @@ export interface LeagueTeam {
   name: string;
   tactical_style: string;
   budget: string;
+  morale: number; // 0–100, baseline 50
+  formation: string; // e.g. "3-3-2" (DEF-MID-ATT, GK implicit)
+  lineup: string[]; // ordered slot assignments (player names; "" = empty)
   players: LeaguePlayer[];
 }
 
@@ -87,7 +100,7 @@ export interface LeagueState {
   payloads: Record<string, MatchPayload>; // keyed by fixture / playoff match id
   playoffs?: PlayoffsState;
   tradeProposals: TradeProposal[];
-  snapshots: string[]; // serialized states at the start of each week (rollback stack)
+  undoStack: string[]; // serialized prior states (universal undo)
 }
 
 export interface StandingRow {
@@ -108,9 +121,67 @@ export function isPlayerOut(p: LeaguePlayer): boolean {
   return p.injuryWeeks > 0 || p.suspensionWeeks > 0;
 }
 
+export type PosGroup = "GK" | "DF" | "MF" | "ST";
+const DF_POS = ["CB", "LB", "RB", "LWB", "RWB", "FB"];
+const MF_POS = ["CDM", "CM", "CAM", "LM", "RM"];
+const ST_POS = ["ST", "CF", "LW", "RW", "WINGER"];
+
+export function positionGroup(pos: string): PosGroup {
+  const p = (pos || "").toUpperCase().trim();
+  if (p === "GK") return "GK";
+  if (DF_POS.includes(p)) return "DF";
+  if (MF_POS.includes(p)) return "MF";
+  if (ST_POS.includes(p)) return "ST";
+  return "MF";
+}
+
+export function parseFormation(f: string): { def: number; mid: number; att: number } {
+  const parts = (f || "").split("-").map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n));
+  if (parts.length === 3 && parts[0] + parts[1] + parts[2] === 8) {
+    return { def: parts[0], mid: parts[1], att: parts[2] };
+  }
+  return { def: 3, mid: 3, att: 2 };
+}
+
+export interface LineupSlot { group: PosGroup; label: string; }
+export function buildLineupSlots(formation: string): LineupSlot[] {
+  const { def, mid, att } = parseFormation(formation);
+  const slots: LineupSlot[] = [{ group: "GK", label: "GK" }];
+  for (let i = 0; i < def; i++) slots.push({ group: "DF", label: `DF${i + 1}` });
+  for (let i = 0; i < mid; i++) slots.push({ group: "MF", label: `MF${i + 1}` });
+  for (let i = 0; i < att; i++) slots.push({ group: "ST", label: `ST${i + 1}` });
+  return slots;
+}
+
+// Pick a sensible default lineup from the available roster honoring slot groups.
+export function buildDefaultLineup(players: LeaguePlayer[], formation: string): string[] {
+  const slots = buildLineupSlots(formation);
+  const used = new Set<string>();
+  const ranked = [...players].sort((a, b) => b.rating - a.rating);
+  const lineup: string[] = [];
+  for (const slot of slots) {
+    let pick = ranked.find((p) => !used.has(p.name) && !isPlayerOut(p) && positionGroup(p.position) === slot.group);
+    if (!pick) pick = ranked.find((p) => !used.has(p.name) && !isPlayerOut(p));
+    if (!pick) pick = ranked.find((p) => !used.has(p.name));
+    if (pick) { used.add(pick.name); lineup.push(pick.name); }
+    else lineup.push("");
+  }
+  return lineup;
+}
+
+// Re-derive each player's `starter` flag from the team lineup.
+export function syncStarters(team: LeagueTeam): LeagueTeam {
+  const inLineup = new Set(team.lineup.filter(Boolean));
+  return {
+    ...team,
+    players: team.players.map((p) => ({ ...p, starter: inLineup.has(p.name) })),
+  };
+}
+
 export function blankPlayer(): LeaguePlayer {
   const base: LeaguePlayer = {
     name: "New Player", position: "CM", starter: false,
+    age: 24, morale: MORALE_BASELINE,
     injuryWeeks: 0, suspensionWeeks: 0, yellowLog: [],
     rating: 5.0, FIN: 5.0, SHO: 5.0, PAS: 5.0, VIS: 5.0, DRI: 5.0,
     PAC: 5.0, STA: 5.0, DEF: 5.0, TAC: 5.0, POS_attr: 5.0, COM: 5.0,
@@ -123,6 +194,7 @@ export function blankPlayer(): LeaguePlayer {
 export function youthPlayer(): LeaguePlayer {
   const base: LeaguePlayer = {
     name: "Youth Academy Call-up", position: "CM", starter: true,
+    age: 18, morale: MORALE_BASELINE,
     injuryWeeks: 0, suspensionWeeks: 0, yellowLog: [],
     rating: 1.0, FIN: 1.0, SHO: 1.0, PAS: 1.0, VIS: 1.0, DRI: 1.0,
     PAC: 1.0, STA: 1.0, DEF: 1.0, TAC: 1.0, POS_attr: 1.0, COM: 1.0,
@@ -145,26 +217,33 @@ function initState(): LeagueState {
   const teamOrder: string[] = [];
   for (const t of RAW_TEAMS) {
     teamOrder.push(t.name);
-    teams[t.name] = {
+    const players = t.roster.map((p, i) => {
+      const player: LeaguePlayer = {
+        name: p.name,
+        position: p.position,
+        starter: i < 9,
+        age: 25,
+        morale: MORALE_BASELINE,
+        injuryWeeks: 0,
+        suspensionWeeks: 0,
+        yellowLog: [],
+        rating: p.rating, FIN: p.FIN, SHO: p.SHO, PAS: p.PAS, VIS: p.VIS, DRI: p.DRI,
+        PAC: p.PAC, STA: p.STA, DEF: p.DEF, TAC: p.TAC, POS_attr: p.POS_attr, COM: p.COM,
+        WR: p.WR, AGG: p.AGG, STR: p.STR, AER: p.AER,
+      };
+      const withAge = { ...player, age: computeStartingAge(player) };
+      return { ...withAge, rating: computeOverall(withAge) };
+    });
+    const lineup = buildDefaultLineup(players, DEFAULT_FORMATION);
+    teams[t.name] = syncStarters({
       name: t.name,
       tactical_style: t.tactical_style,
       budget: INITIAL_BUDGETS[t.name] ?? "$0M",
-      players: t.roster.map((p, i) => {
-        const player: LeaguePlayer = {
-          name: p.name,
-          position: p.position,
-          starter: i < 9,
-          injuryWeeks: 0,
-          suspensionWeeks: 0,
-          yellowLog: [],
-          rating: p.rating, FIN: p.FIN, SHO: p.SHO, PAS: p.PAS, VIS: p.VIS, DRI: p.DRI,
-          PAC: p.PAC, STA: p.STA, DEF: p.DEF, TAC: p.TAC, POS_attr: p.POS_attr, COM: p.COM,
-          WR: p.WR, AGG: p.AGG, STR: p.STR, AER: p.AER,
-        };
-        // OVR is an automated weighted average — derive it from the attributes.
-        return { ...player, rating: computeOverall(player) };
-      }),
-    };
+      morale: MORALE_BASELINE,
+      formation: DEFAULT_FORMATION,
+      lineup,
+      players,
+    });
   }
   const fixtures: FixtureEntry[] = INITIAL_SCHEDULE.map((f, i) => ({
     id: `w${f.week}-m${i}`,
@@ -174,7 +253,7 @@ function initState(): LeagueState {
   }));
   return {
     currentWeek: 1, season: 1, teamOrder, teams, fixtures,
-    results: {}, payloads: {}, tradeProposals: [], snapshots: [],
+    results: {}, payloads: {}, tradeProposals: [], undoStack: [],
   };
 }
 
@@ -183,25 +262,41 @@ function normalize(state: LeagueState): LeagueState {
   const teams: Record<string, LeagueTeam> = {};
   for (const name of state.teamOrder) {
     const t = state.teams[name];
-    teams[name] = {
+    const players = t.players.map((p) => {
+      const player: LeaguePlayer = {
+        ...p,
+        injuryWeeks: p.injuryWeeks ?? 0,
+        suspensionWeeks: p.suspensionWeeks ?? 0,
+        yellowLog: p.yellowLog ?? [],
+        morale: p.morale ?? MORALE_BASELINE,
+        age: p.age ?? 25,
+      };
+      const withAge = player.age ? player : { ...player, age: computeStartingAge(player) };
+      return { ...withAge, rating: computeOverall(withAge) };
+    });
+    const formation = t.formation ?? DEFAULT_FORMATION;
+    let lineup = t.lineup;
+    if (!lineup || lineup.length === 0) {
+      // Migrate from old `starter` booleans, falling back to a default lineup.
+      const starters = players.filter((p) => p.starter).map((p) => p.name);
+      lineup = starters.length === buildLineupSlots(formation).length
+        ? starters
+        : buildDefaultLineup(players, formation);
+    }
+    teams[name] = syncStarters({
       ...t,
-      players: t.players.map((p) => {
-        const player: LeaguePlayer = {
-          ...p,
-          injuryWeeks: p.injuryWeeks ?? 0,
-          suspensionWeeks: p.suspensionWeeks ?? 0,
-          yellowLog: p.yellowLog ?? [],
-        };
-        return { ...player, rating: computeOverall(player) };
-      }),
-    };
+      morale: t.morale ?? MORALE_BASELINE,
+      formation,
+      lineup,
+      players,
+    });
   }
   return {
     ...state,
     season: state.season ?? 1,
     tradeProposals: state.tradeProposals ?? [],
     payloads: state.payloads ?? {},
-    snapshots: state.snapshots ?? [],
+    undoStack: state.undoStack ?? [],
     teams,
   };
 }
@@ -365,17 +460,22 @@ export function isManualOnly(home: string, away: string): boolean {
 }
 
 // Build the ordered roster for the engine: available starters first, then
-// available bench. Injured/suspended players are excluded entirely.
+// available bench. Injured/suspended players are excluded entirely. Morale
+// scales the attributes fed into the engine.
 export function rosterForEngine(team: LeagueTeam) {
   const available = team.players.filter((p) => !isPlayerOut(p));
-  const starters = available.filter((p) => p.starter);
-  const bench = available.filter((p) => !p.starter);
-  return [...starters, ...bench].map((p) => ({
-    name: p.name, position: p.position, rating: p.rating,
-    FIN: p.FIN, SHO: p.SHO, PAS: p.PAS, VIS: p.VIS, DRI: p.DRI, PAC: p.PAC, STA: p.STA,
-    DEF: p.DEF, TAC: p.TAC, POS_attr: p.POS_attr, COM: p.COM, WR: p.WR, AGG: p.AGG,
-    STR: p.STR, AER: p.AER,
-  }));
+  const inLineup = new Set(team.lineup.filter(Boolean));
+  const starters = available.filter((p) => inLineup.has(p.name));
+  const bench = available.filter((p) => !inLineup.has(p.name));
+  return [...starters, ...bench].map((p) => {
+    const a = moraleScaledAttrs(p, team.morale, p.morale);
+    return {
+      name: p.name, position: p.position, rating: a.rating,
+      FIN: a.FIN, SHO: a.SHO, PAS: a.PAS, VIS: a.VIS, DRI: a.DRI, PAC: a.PAC, STA: a.STA,
+      DEF: a.DEF, TAC: a.TAC, POS_attr: a.POS_attr, COM: a.COM, WR: a.WR, AGG: a.AGG,
+      STR: a.STR, AER: a.AER,
+    };
+  });
 }
 
 export interface SimOutput {
@@ -399,8 +499,6 @@ export function simulateMatch(
   const engineAway = buildEngineTeam(at.name, at.tactical_style, rosterForEngine(at));
   const result = run_match(engineHome, engineAway, tempo, goalMultiplier);
 
-  // Build the structured JSON payload from the final engine state. Reading the
-  // post-match flags does NOT alter the engine's math or random sequence.
   const payload = buildMatchPayload(
     engineHome, engineAway, home, away, result.homeGoals, result.awayGoals
   );
@@ -408,9 +506,6 @@ export function simulateMatch(
 }
 
 // ---------------- Match effects (injuries + disciplinary) ----------------
-// Applies a match payload's disciplinary outcomes and injuries to the team map.
-// Returns the new teams and a protected-key set (players whose timers should NOT
-// decrement during this week's advance because the event happened this week).
 function applyMatchEffects(
   teams: Record<string, LeagueTeam>,
   payload: MatchPayload | undefined,
@@ -433,7 +528,6 @@ function applyMatchEffects(
     next[teamName] = { ...team, players };
   };
 
-  // Disciplinary: yellow accumulation + straight reds.
   if (payload) {
     for (const ps of payload.players) {
       if (ps.red) {
@@ -464,7 +558,6 @@ function applyMatchEffects(
     }
   }
 
-  // Injuries (carried off): roll a duration and pull from the lineup.
   if (injured && injured.length) {
     for (const inj of injured) {
       updatePlayerIn(inj.team, inj.name, (p) => ({
@@ -479,6 +572,75 @@ function applyMatchEffects(
   return { teams: next, protectedKeys };
 }
 
+// ---------------- Morale: match events ----------------
+// Mutates clones of the two affected clubs in the teams map and returns a new
+// map. Disciplinary/injury changes already applied to those players are kept.
+function applyMatchMorale(
+  teams: Record<string, LeagueTeam>,
+  standings: StandingRow[],
+  homeName: string,
+  awayName: string,
+  homeGoals: number,
+  awayGoals: number,
+  payload: MatchPayload | undefined
+): Record<string, LeagueTeam> {
+  const next = { ...teams };
+  const clone = (name: string): LeagueTeam | undefined => {
+    if (!next[name]) return undefined;
+    const t: LeagueTeam = { ...next[name], players: next[name].players.map((p) => ({ ...p })) };
+    next[name] = t;
+    return t;
+  };
+  const home = clone(homeName);
+  const away = clone(awayName);
+  if (!home || !away) return next;
+
+  const rankOf = (name: string) => standings.find((s) => s.team === name)?.rank ?? 99;
+  const total = standings.length;
+  const top5 = (name: string) => rankOf(name) <= 5;
+  const bottom5 = (name: string) => rankOf(name) > total - 5;
+
+  // Team macro events (apply to all 24 clubs).
+  if (homeGoals === awayGoals) {
+    applyTeamEvent(home, "stalemate");
+    applyTeamEvent(away, "stalemate");
+  } else {
+    const winner = homeGoals > awayGoals ? home : away;
+    const loser = homeGoals > awayGoals ? away : home;
+    applyTeamEvent(winner, top5(loser.name) ? "elite_victory" : "standard_victory");
+    applyTeamEvent(loser, bottom5(winner.name) ? "upset_defeat" : "standard_defeat");
+  }
+
+  // Player micro events (exempt clubs are skipped inside applyPlayerEvent).
+  if (payload) {
+    const sideOf = (teamName: string) => (teamName === home.name ? home : teamName === away.name ? away : undefined);
+    for (const ps of payload.players) {
+      const side = sideOf(ps.team);
+      if (!side) continue;
+      const player = side.players.find((p) => p.name === ps.name);
+      if (!player) continue;
+      for (let i = 0; i < ps.goals; i++) applyPlayerEvent(side, player, "goal");
+      for (let i = 0; i < ps.assists; i++) applyPlayerEvent(side, player, "assist");
+      for (let i = 0; i < ps.yellow; i++) applyPlayerEvent(side, player, "yellow_card");
+      if (ps.red) applyPlayerEvent(side, player, "red_card");
+      if (ps.injured) applyPlayerEvent(side, player, "injured");
+    }
+    for (const g of payload.goalkeepers) {
+      const side = sideOf(g.team);
+      if (!side || !g.cleanSheet) continue;
+      const keeper = side.players.find((p) => p.name === g.name);
+      if (keeper) applyPlayerEvent(side, keeper, "clean_sheet");
+    }
+    // Locker room crisis: a starter injured during the match.
+    for (const inj of payload.injuries) {
+      const side = sideOf(inj.team);
+      if (side) applyTeamEvent(side, "locker_room_crisis");
+    }
+  }
+
+  return next;
+}
+
 // ---------------- Context ----------------
 interface LeagueContextValue {
   state: LeagueState;
@@ -489,12 +651,13 @@ interface LeagueContextValue {
     method: "SIM" | "MANUAL",
     payload?: MatchPayload
   ) => void;
-  resetMatchResult: (fixtureId: string) => void;
-  rollbackWeek: () => void;
-  canRollback: boolean;
+  undo: () => void;
+  canUndo: boolean;
   updateBudget: (team: string, budget: string) => void;
   updatePlayer: (team: string, index: number, patch: Partial<LeaguePlayer>) => void;
-  toggleStarter: (team: string, index: number) => void;
+  setLineupSlot: (team: string, slot: number, playerName: string) => void;
+  setFormation: (team: string, formation: string) => void;
+  autoFillLineup: (team: string) => void;
   setInjuryWeeks: (team: string, index: number, weeks: number) => void;
   setSuspensionWeeks: (team: string, index: number, weeks: number) => void;
   addPlayer: (team: string) => void;
@@ -509,6 +672,7 @@ interface LeagueContextValue {
   generatePlayoffs: () => void;
   setPlayoffResult: (matchId: string, homeGoals: number, awayGoals: number, method: "SIM" | "MANUAL", payload?: MatchPayload) => void;
   executeTrade: (proposal: TradeProposal) => void;
+  executeManualTrade: (teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashAReceives: number, cashBReceives: number) => void;
   declineTrade: (proposalId: string) => void;
   refreshTradeProposals: () => void;
   resetLeague: () => void;
@@ -518,38 +682,111 @@ interface LeagueContextValue {
 
 const LeagueContext = createContext<LeagueContextValue | null>(null);
 
-// Move a player (by name) from one team to another, and shift cash.
-function applyTrade(prev: LeagueState, t: TradeProposal): LeagueState {
-  const teamA = prev.teams[t.teamA];
-  const teamB = prev.teams[t.teamB];
-  if (!teamA || !teamB) return prev;
-
-  const aIdx = teamA.players.findIndex((p) => p.name === t.aSends);
-  const bIdx = teamB.players.findIndex((p) => p.name === t.bSends);
-  if (aIdx < 0 || bIdx < 0) return prev;
-
-  const playerFromA = { ...teamA.players[aIdx], starter: false };
-  const playerFromB = { ...teamB.players[bIdx], starter: false };
-
-  const newA = teamA.players.filter((_, i) => i !== aIdx).concat(playerFromB);
-  const newB = teamB.players.filter((_, i) => i !== bIdx).concat(playerFromA);
-
-  const aBudget = parseBudget(teamA.budget) + t.cashAReceives - t.cashBReceives;
-  const bBudget = parseBudget(teamB.budget) + t.cashBReceives - t.cashAReceives;
-
-  return {
-    ...prev,
-    teams: {
-      ...prev.teams,
-      [t.teamA]: { ...teamA, players: newA, budget: formatBudget(aBudget) },
-      [t.teamB]: { ...teamB, players: newB, budget: formatBudget(bBudget) },
-    },
-  };
+// Auto-promote acquired players into the lineup if they outrate the current
+// starter in their position group (feature: new acquisitions take a spot).
+function autoPromote(team: LeagueTeam, incoming: LeaguePlayer[]): LeagueTeam {
+  const slots = buildLineupSlots(team.formation);
+  const lineup = [...team.lineup];
+  for (const inc of incoming) {
+    const g = positionGroup(inc.position);
+    let worstIdx = -1;
+    let worstRating = Infinity;
+    slots.forEach((s, i) => {
+      if (s.group !== g) return;
+      if (lineup[i] === inc.name) { worstIdx = -2; return; } // already starting
+      const cur = team.players.find((p) => p.name === lineup[i]);
+      const r = cur ? cur.rating : -1;
+      if (r < worstRating) { worstRating = r; worstIdx = i; }
+    });
+    if (worstIdx >= 0 && inc.rating > worstRating) lineup[worstIdx] = inc.name;
+  }
+  return { ...team, lineup };
 }
 
-// Serialize a state for the rollback stack (without the stack itself).
-function serializeSnapshot(state: LeagueState): string {
-  return JSON.stringify({ ...state, snapshots: [] });
+// Core multi-player trade: move named players + cash between two clubs, apply
+// morale events, auto-promote upgrades, and re-sync lineups.
+function moveTrade(
+  prev: LeagueState,
+  aName: string,
+  bName: string,
+  aPlayers: string[],
+  bPlayers: string[],
+  cashAReceives: number,
+  cashBReceives: number
+): LeagueState {
+  if (aName === bName) return prev;
+  const teamA = prev.teams[aName];
+  const teamB = prev.teams[bName];
+  if (!teamA || !teamB) return prev;
+
+  const aSet = new Set(aPlayers.filter(Boolean));
+  const bSet = new Set(bPlayers.filter(Boolean));
+  const movingFromA = teamA.players.filter((p) => aSet.has(p.name)).map((p) => ({ ...p, starter: false }));
+  const movingFromB = teamB.players.filter((p) => bSet.has(p.name)).map((p) => ({ ...p, starter: false }));
+  if (!movingFromA.length && !movingFromB.length && cashAReceives === 0 && cashBReceives === 0) return prev;
+
+  const aBudgetBefore = parseBudget(teamA.budget);
+  const bBudgetBefore = parseBudget(teamB.budget);
+
+  let aTeam: LeagueTeam = {
+    ...teamA,
+    budget: formatBudget(aBudgetBefore + cashAReceives - cashBReceives),
+    lineup: teamA.lineup.map((n) => (aSet.has(n) ? "" : n)),
+    players: teamA.players.filter((p) => !aSet.has(p.name)).concat(movingFromB),
+  };
+  let bTeam: LeagueTeam = {
+    ...teamB,
+    budget: formatBudget(bBudgetBefore + cashBReceives - cashAReceives),
+    lineup: teamB.lineup.map((n) => (bSet.has(n) ? "" : n)),
+    players: teamB.players.filter((p) => !bSet.has(p.name)).concat(movingFromA),
+  };
+
+  // Auto-promote upgrades into the lineup.
+  aTeam = autoPromote(aTeam, movingFromB);
+  bTeam = autoPromote(bTeam, movingFromA);
+
+  // Team morale: market triumph for both; asset depletion when sending without
+  // receiving a player back.
+  applyTeamEvent(aTeam, "market_triumph");
+  applyTeamEvent(bTeam, "market_triumph");
+  if (movingFromA.length > 0 && movingFromB.length === 0) applyTeamEvent(aTeam, "asset_depletion");
+  if (movingFromB.length > 0 && movingFromA.length === 0) applyTeamEvent(bTeam, "asset_depletion");
+
+  // Player career promotion / demotion based on destination club budget.
+  const promoEvent = (from: number, to: number): TeamEvent | null => null; // placeholder unused
+  void promoEvent;
+  for (const moved of movingFromA) {
+    const player = bTeam.players.find((p) => p.name === moved.name);
+    if (!player) continue;
+    if (bBudgetBefore > aBudgetBefore) applyPlayerEvent(bTeam, player, "career_promotion");
+    else if (bBudgetBefore < aBudgetBefore) applyPlayerEvent(bTeam, player, "career_demotion");
+  }
+  for (const moved of movingFromB) {
+    const player = aTeam.players.find((p) => p.name === moved.name);
+    if (!player) continue;
+    if (aBudgetBefore > bBudgetBefore) applyPlayerEvent(aTeam, player, "career_promotion");
+    else if (aBudgetBefore < bBudgetBefore) applyPlayerEvent(aTeam, player, "career_demotion");
+  }
+
+  aTeam = syncStarters(aTeam);
+  bTeam = syncStarters(bTeam);
+
+  return { ...prev, teams: { ...prev.teams, [aName]: aTeam, [bName]: bTeam } };
+}
+
+// Offseason aging + retirement for one club.
+function offseasonTeam(team: LeagueTeam): LeagueTeam {
+  const players: LeaguePlayer[] = [];
+  let moraleBump = 0;
+  for (const p of team.players) {
+    const res = ageOnePlayer({ ...p, injuryWeeks: 0, suspensionWeeks: 0, yellowLog: [] });
+    if (res.veteranFulfilled) moraleBump += 1;
+    players.push(res.retired ? res.replacement! : res.player);
+  }
+  // Veteran fulfillment lifts overall club morale slightly.
+  const morale = Math.max(0, Math.min(100, team.morale + moraleBump * 2));
+  const lineup = buildDefaultLineup(players, team.formation);
+  return syncStarters({ ...team, players, morale, lineup });
 }
 
 export function LeagueProvider({ children }: { children: ReactNode }) {
@@ -566,24 +803,39 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   const standings = useMemo(() => computeStandings(state), [state]);
   const leaderboards = useMemo(() => computeLeaderboards(state), [state]);
 
-  // Decrement injuries/suspensions for everyone EXCEPT players affected this week,
-  // then run the weekly trade engine if inside the transfer window.
+  // Universal undo: every mutating action snapshots the prior state.
+  function update(producer: (prev: LeagueState) => LeagueState) {
+    setState((prev) => {
+      const next = producer(prev);
+      if (next === prev) return prev;
+      const snap = JSON.stringify({ ...prev, undoStack: [] });
+      return { ...next, undoStack: [...prev.undoStack, snap].slice(-MAX_UNDO) };
+    });
+  }
+
   function onWeekAdvanced(next: LeagueState, protectedKeys: Set<string>): LeagueState {
     const teams: Record<string, LeagueTeam> = {};
     for (const name of next.teamOrder) {
       const t = next.teams[name];
-      teams[name] = {
-        ...t,
-        players: t.players.map((p) => {
-          if (protectedKeys.has(`${name}::${p.name}`)) return p;
-          if (p.injuryWeeks === 0 && p.suspensionWeeks === 0) return p;
-          return {
+      const inLineup = new Set(t.lineup.filter(Boolean));
+      const players = t.players.map((p) => {
+        let np = p;
+        if (!protectedKeys.has(`${name}::${p.name}`) && (p.injuryWeeks > 0 || p.suspensionWeeks > 0)) {
+          const wasOut = p.injuryWeeks > 0 || p.suspensionWeeks > 0;
+          np = {
             ...p,
             injuryWeeks: p.injuryWeeks >= SEASON_ENDING_WEEKS ? p.injuryWeeks : Math.max(0, p.injuryWeeks - 1),
             suspensionWeeks: Math.max(0, p.suspensionWeeks - 1),
           };
-        }),
-      };
+          // Comeback: returned to availability this week.
+          if (wasOut && np.injuryWeeks === 0 && np.suspensionWeeks === 0) {
+            np = { ...np, morale: Math.max(0, Math.min(100, np.morale + 15)) };
+          }
+        }
+        // Weekly selection / bench morale (non-exempt handled by team identity).
+        return np;
+      });
+      teams[name] = { ...t, players };
     }
     let advanced: LeagueState = { ...next, teams };
     if (advanced.currentWeek <= TRANSFER_WINDOW_LAST_WEEK) {
@@ -599,10 +851,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     if (!allPlayed) return next;
     const maxWeek = maxScheduledWeek(next);
     if (wk < maxWeek) {
-      const advanced = onWeekAdvanced({ ...next, currentWeek: wk + 1 }, protectedKeys);
-      // Snapshot the clean start of the new week for the rollback stack.
-      const snaps = [...advanced.snapshots, serializeSnapshot(advanced)].slice(-24);
-      return { ...advanced, snapshots: snaps };
+      return onWeekAdvanced({ ...next, currentWeek: wk + 1 }, protectedKeys);
     }
     return onWeekAdvanced(next, protectedKeys);
   }
@@ -611,78 +860,102 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     state,
     standings,
     leaderboards,
-    canRollback: state.snapshots.length > 0,
+    canUndo: state.undoStack.length > 0,
     setResult: (fixtureId, homeGoals, awayGoals, method, payload) =>
-      setState((prev) => {
+      update((prev) => {
+        const fixture = prev.fixtures.find((f) => f.id === fixtureId);
+        const preStandings = computeStandings(prev);
         const { teams, protectedKeys } = applyMatchEffects(
           prev.teams, payload, payload?.injuries, prev.currentWeek
         );
+        const moraleTeams = fixture
+          ? applyMatchMorale(teams, preStandings, fixture.home, fixture.away, homeGoals, awayGoals, payload)
+          : teams;
         const next: LeagueState = {
           ...prev,
-          teams,
+          teams: moraleTeams,
           results: { ...prev.results, [fixtureId]: { homeGoals, awayGoals, method } },
           payloads: payload ? { ...prev.payloads, [fixtureId]: payload } : prev.payloads,
         };
         return advanceWeekIfComplete(next, protectedKeys);
       }),
-    resetMatchResult: (fixtureId) =>
+    undo: () =>
       setState((prev) => {
-        const results = { ...prev.results };
-        delete results[fixtureId];
-        const payloads = { ...prev.payloads };
-        delete payloads[fixtureId];
-        return { ...prev, results, payloads };
-      }),
-    rollbackWeek: () =>
-      setState((prev) => {
-        if (!prev.snapshots.length) return prev;
-        const stack = [...prev.snapshots];
+        if (!prev.undoStack.length) return prev;
+        const stack = [...prev.undoStack];
         const last = stack.pop()!;
         try {
           const restored = JSON.parse(last) as LeagueState;
-          return normalize({ ...restored, snapshots: stack });
+          return normalize({ ...restored, undoStack: stack });
         } catch {
           return prev;
         }
       }),
     updateBudget: (team, budget) =>
-      setState((prev) => ({
+      update((prev) => ({
         ...prev,
         teams: { ...prev.teams, [team]: { ...prev.teams[team], budget } },
       })),
     updatePlayer: (team, index, patch) =>
-      setState((prev) => {
+      update((prev) => {
+        const oldName = prev.teams[team].players[index]?.name;
         const players = prev.teams[team].players.map((p, i) => {
           if (i !== index) return p;
           const merged = { ...p, ...patch };
-          // OVR is automated: always recompute from attributes / position.
           return { ...merged, rating: computeOverall(merged) };
         });
-        return { ...prev, teams: { ...prev.teams, [team]: { ...prev.teams[team], players } } };
+        // If the player was renamed, keep the lineup reference in sync.
+        const newName = players[index]?.name;
+        let lineup = prev.teams[team].lineup;
+        if (oldName && newName && oldName !== newName) {
+          lineup = lineup.map((n) => (n === oldName ? newName : n));
+        }
+        return {
+          ...prev,
+          teams: { ...prev.teams, [team]: syncStarters({ ...prev.teams[team], players, lineup }) },
+        };
       }),
-    toggleStarter: (team, index) =>
-      setState((prev) => {
-        const players = prev.teams[team].players.map((p, i) =>
-          i === index ? { ...p, starter: !p.starter } : p
-        );
-        return { ...prev, teams: { ...prev.teams, [team]: { ...prev.teams[team], players } } };
+    setLineupSlot: (team, slot, playerName) =>
+      update((prev) => {
+        const t = prev.teams[team];
+        const lineup = [...t.lineup];
+        // Prevent duplicates: clear the player from any other slot first.
+        for (let i = 0; i < lineup.length; i++) {
+          if (lineup[i] === playerName && i !== slot) lineup[i] = "";
+        }
+        lineup[slot] = playerName;
+        return { ...prev, teams: { ...prev.teams, [team]: syncStarters({ ...t, lineup }) } };
+      }),
+    setFormation: (team, formation) =>
+      update((prev) => {
+        const t = prev.teams[team];
+        const slots = buildLineupSlots(formation);
+        const oldLineup = t.lineup;
+        const lineup = slots.map((_, i) => oldLineup[i] ?? "");
+        return { ...prev, teams: { ...prev.teams, [team]: syncStarters({ ...t, formation, lineup }) } };
+      }),
+    autoFillLineup: (team) =>
+      update((prev) => {
+        const t = prev.teams[team];
+        const lineup = buildDefaultLineup(t.players, t.formation);
+        return { ...prev, teams: { ...prev.teams, [team]: syncStarters({ ...t, lineup }) } };
       }),
     setInjuryWeeks: (team, index, weeks) =>
-      setState((prev) => {
+      update((prev) => {
         const players = prev.teams[team].players.map((p, i) =>
           i === index ? { ...p, injuryWeeks: Math.max(0, weeks) } : p
         );
         return { ...prev, teams: { ...prev.teams, [team]: { ...prev.teams[team], players } } };
       }),
     setSuspensionWeeks: (team, index, weeks) =>
-      setState((prev) => {
+      update((prev) => {
         const players = prev.teams[team].players.map((p, i) =>
           i === index ? { ...p, suspensionWeeks: Math.max(0, weeks) } : p
         );
         return { ...prev, teams: { ...prev.teams, [team]: { ...prev.teams[team], players } } };
       }),
     addPlayer: (team) =>
-      setState((prev) => ({
+      update((prev) => ({
         ...prev,
         teams: {
           ...prev.teams,
@@ -690,7 +963,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         },
       })),
     addYouthPlayer: (team) =>
-      setState((prev) => ({
+      update((prev) => ({
         ...prev,
         teams: {
           ...prev.teams,
@@ -698,15 +971,15 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         },
       })),
     removePlayer: (team, index) =>
-      setState((prev) => ({
-        ...prev,
-        teams: {
-          ...prev.teams,
-          [team]: { ...prev.teams[team], players: prev.teams[team].players.filter((_, i) => i !== index) },
-        },
-      })),
+      update((prev) => {
+        const t = prev.teams[team];
+        const removed = t.players[index]?.name;
+        const players = t.players.filter((_, i) => i !== index);
+        const lineup = t.lineup.map((n) => (n === removed ? "" : n));
+        return { ...prev, teams: { ...prev.teams, [team]: syncStarters({ ...t, players, lineup }) } };
+      }),
     renameTeam: (oldName, newName) =>
-      setState((prev) => {
+      update((prev) => {
         const trimmed = newName.trim();
         if (!trimmed || trimmed === oldName || prev.teams[trimmed]) return prev;
         const teamOrder = prev.teamOrder.map((n) => (n === oldName ? trimmed : n));
@@ -743,7 +1016,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         return { ...prev, teamOrder, teams, fixtures, playoffs, tradeProposals };
       }),
     addFixtures: (entries) =>
-      setState((prev) => {
+      update((prev) => {
         const base = prev.fixtures.length;
         const added: FixtureEntry[] = entries.map((e, i) => ({
           id: `s${prev.season}-w${e.week}-m${base + i}-${Date.now() + i}`,
@@ -754,7 +1027,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         return advanceWeekIfComplete({ ...prev, fixtures: [...prev.fixtures, ...added] }, new Set());
       }),
     removeFixture: (fixtureId) =>
-      setState((prev) => {
+      update((prev) => {
         const fixtures = prev.fixtures.filter((f) => f.id !== fixtureId);
         const results = { ...prev.results };
         delete results[fixtureId];
@@ -763,7 +1036,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         return { ...prev, fixtures, results, payloads };
       }),
     scheduleFinalFour: (entries) =>
-      setState((prev) => {
+      update((prev) => {
         const base = prev.fixtures.length;
         const added: FixtureEntry[] = entries.map((e, i) => ({
           id: `s${prev.season}-w${e.week}-m${base + i}-${Date.now() + i}`,
@@ -774,17 +1047,12 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         return advanceWeekIfComplete({ ...prev, fixtures: [...prev.fixtures, ...added] }, new Set());
       }),
     scheduleNewSeason: (entries) =>
-      setState((prev) => {
-        // Carry rosters & budgets; clear everything else and lay down the new
-        // 12-week schedule in one step (this starts the new season).
+      update((prev) => {
+        // Offseason: age all squads, run retirements, carry rosters/budgets/morale.
         const season = prev.season + 1;
         const teams: Record<string, LeagueTeam> = {};
         for (const name of prev.teamOrder) {
-          const t = prev.teams[name];
-          teams[name] = {
-            ...t,
-            players: t.players.map((p) => ({ ...p, injuryWeeks: 0, suspensionWeeks: 0, yellowLog: [] })),
-          };
+          teams[name] = offseasonTeam(prev.teams[name]);
         }
         const fixtures: FixtureEntry[] = entries.map((e, i) => ({
           id: `s${season}-w${e.week}-m${i}-${Date.now() + i}`,
@@ -801,21 +1069,14 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
           payloads: {},
           playoffs: undefined,
           tradeProposals: [],
-          snapshots: [],
           teams,
         };
       }),
     startNewSeason: () =>
-      setState((prev) => {
-        // Keep rosters & budgets; clear results/fixtures/playoffs and all
-        // injury/suspension counters; reset to a fresh pre-season.
+      update((prev) => {
         const teams: Record<string, LeagueTeam> = {};
         for (const name of prev.teamOrder) {
-          const t = prev.teams[name];
-          teams[name] = {
-            ...t,
-            players: t.players.map((p) => ({ ...p, injuryWeeks: 0, suspensionWeeks: 0, yellowLog: [] })),
-          };
+          teams[name] = offseasonTeam(prev.teams[name]);
         }
         return {
           ...prev,
@@ -826,17 +1087,16 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
           payloads: {},
           playoffs: undefined,
           tradeProposals: [],
-          snapshots: [],
           teams,
         };
       }),
     generatePlayoffs: () =>
-      setState((prev) => {
+      update((prev) => {
         if (prev.playoffs) return prev;
         return { ...prev, playoffs: buildPlayoffs(prev) };
       }),
     setPlayoffResult: (matchId, homeGoals, awayGoals, method, payload) =>
-      setState((prev) => {
+      update((prev) => {
         if (!prev.playoffs) return prev;
         const { teams } = applyMatchEffects(
           prev.teams, payload, payload?.injuries, prev.currentWeek
@@ -854,18 +1114,24 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         };
       }),
     executeTrade: (proposal) =>
-      setState((prev) => {
-        const next = applyTrade(prev, proposal);
+      update((prev) => {
+        const next = moveTrade(
+          prev, proposal.teamA, proposal.teamB,
+          [proposal.aSends], [proposal.bSends],
+          proposal.cashAReceives, proposal.cashBReceives
+        );
         if (next === prev) return prev;
         return { ...next, tradeProposals: next.tradeProposals.filter((t) => t.id !== proposal.id) };
       }),
+    executeManualTrade: (teamA, teamB, aPlayers, bPlayers, cashAReceives, cashBReceives) =>
+      update((prev) => moveTrade(prev, teamA, teamB, aPlayers, bPlayers, cashAReceives, cashBReceives)),
     declineTrade: (proposalId) =>
-      setState((prev) => ({
+      update((prev) => ({
         ...prev,
         tradeProposals: prev.tradeProposals.filter((t) => t.id !== proposalId),
       })),
     refreshTradeProposals: () =>
-      setState((prev) => ({ ...prev, tradeProposals: generateTradeProposals(prev) })),
+      update((prev) => ({ ...prev, tradeProposals: generateTradeProposals(prev) })),
     resetLeague: () => setState(initState()),
   };
 
