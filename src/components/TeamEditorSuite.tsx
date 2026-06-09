@@ -326,45 +326,70 @@ export function TeamEditorSuite() {
   );
 }
 
-function PitchRow({
-  slots, group, team, t, setLineupSlot,
+function PitchField({
+  slots, team, t, setLineupSlot,
 }: {
-  slots: { group: string; label: string }[];
-  group: string;
+  slots: LineupSlot[];
   team: string;
   t: { players: { name: string; position: string }[]; lineup: string[] };
   setLineupSlot: (team: string, slot: number, name: string) => void;
 }) {
-  const indices = slots
-    .map((s, i) => ({ s, i }))
-    .filter(({ s }) => s.group === group);
-  if (!indices.length) return null;
+  // Render outfield rows from attack (top) down to defense, GK at the very bottom.
+  const lines = Array.from(new Set(slots.map((s) => s.line))).sort((a, b) => b - a);
 
   return (
-    <div className="mb-3 flex flex-wrap justify-center gap-3 last:mb-0">
-      {indices.map(({ s, i }) => {
-        const current = t.lineup[i] ?? "";
-        const eligible = t.players.filter((p) => positionGroup(p.position) === group);
-        return (
-          <div key={i} className={`w-40 rounded-lg border p-1.5 ${GROUP_COLOR[group] ?? "bg-card"}`}>
-            <div className="mb-1 text-center text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-              {s.label}
+    <div
+      className="relative overflow-hidden rounded-lg border border-emerald-200/40 p-4 shadow-inner"
+      style={{
+        background:
+          "repeating-linear-gradient(0deg, #1f9d4d 0px, #1f9d4d 36px, #178a43 36px, #178a43 72px)",
+      }}
+    >
+      {/* Pitch markings */}
+      <div className="pointer-events-none absolute inset-3 rounded-md border-2 border-white/70" />
+      <div className="pointer-events-none absolute left-3 right-3 top-1/2 h-0 -translate-y-1/2 border-t-2 border-white/70" />
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/70" />
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/80" />
+      <div className="pointer-events-none absolute left-1/2 top-3 h-12 w-40 -translate-x-1/2 border-2 border-t-0 border-white/70" />
+      <div className="pointer-events-none absolute bottom-3 left-1/2 h-12 w-40 -translate-x-1/2 border-2 border-b-0 border-white/70" />
+
+      <div className="relative z-10 flex flex-col gap-4">
+        {lines.map((line) => {
+          const indices = slots.map((s, i) => ({ s, i })).filter(({ s }) => s.line === line);
+          return (
+            <div key={line} className="flex flex-wrap justify-center gap-3">
+              {indices.map(({ s, i }) => {
+                const current = t.lineup[i] ?? "";
+                const isGK = s.group === "GK";
+                return (
+                  <div
+                    key={i}
+                    className={`w-40 rounded-lg border p-1.5 shadow-md backdrop-blur ${
+                      isGK ? "border-amber-300 bg-amber-100/90" : "border-white/60 bg-white/90"
+                    }`}
+                  >
+                    <div className="mb-1 text-center text-[10px] font-bold uppercase tracking-wide text-emerald-900">
+                      {isGK ? "GK" : s.label}
+                    </div>
+                    <Select
+                      value={current || "__none__"}
+                      onValueChange={(v) => setLineupSlot(team, i, v === "__none__" ? "" : v)}
+                    >
+                      <SelectTrigger className="h-8 w-full bg-card text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— empty —</SelectItem>
+                        {t.players.map((p) => (
+                          <SelectItem key={p.name} value={p.name}>{p.name} ({p.position})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })}
             </div>
-            <Select
-              value={current || "__none__"}
-              onValueChange={(v) => setLineupSlot(team, i, v === "__none__" ? "" : v)}
-            >
-              <SelectTrigger className="h-8 w-full bg-card text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">— empty —</SelectItem>
-                {eligible.map((p) => (
-                  <SelectItem key={p.name} value={p.name}>{p.name} ({p.position})</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
