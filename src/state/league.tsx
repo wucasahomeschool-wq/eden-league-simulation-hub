@@ -286,6 +286,8 @@ function normalize(state: LeagueState): LeagueState {
         yellowLog: p.yellowLog ?? [],
         morale: p.morale ?? MORALE_BASELINE,
         age: p.age ?? 25,
+        salary: p.salary ?? calculateMarketValue(p.rating ?? 5),
+        contractYears: p.contractYears ?? 0,
       };
       const withAge = player.age ? player : { ...player, age: computeStartingAge(player) };
       return { ...withAge, rating: computeOverall(withAge) };
@@ -305,7 +307,17 @@ function normalize(state: LeagueState): LeagueState {
       formation,
       lineup,
       players,
+      salaryBudget: t.salaryBudget ?? 0,
     });
+  }
+  let salaryCap = state.salaryCap ?? 0;
+  let contractsInitialized = state.contractsInitialized ?? false;
+  let outTeams = teams;
+  if (!contractsInitialized || salaryCap <= 0) {
+    const init = initializeContracts(teams, state.teamOrder);
+    outTeams = init.teams;
+    salaryCap = init.salaryCap;
+    contractsInitialized = true;
   }
   return {
     ...state,
@@ -313,7 +325,10 @@ function normalize(state: LeagueState): LeagueState {
     tradeProposals: state.tradeProposals ?? [],
     payloads: state.payloads ?? {},
     undoStack: state.undoStack ?? [],
-    teams,
+    teams: outTeams,
+    salaryCap,
+    freeAgents: state.freeAgents ?? [],
+    contractsInitialized,
   };
 }
 
