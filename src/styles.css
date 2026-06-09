@@ -90,7 +90,14 @@
   }
   body {
     background-color: var(--color-background);
+    background-image: var(--gradient-pitch),
+      repeating-linear-gradient(90deg, color-mix(in oklab, #ffffff 6%, transparent) 0 56px, transparent 56px 112px);
+    background-attachment: fixed;
     color: var(--color-foreground);
     font-family: var(--font-sans);
   }
+}
+
+@utility glow {
+  box-shadow: var(--shadow-glow);
 }
