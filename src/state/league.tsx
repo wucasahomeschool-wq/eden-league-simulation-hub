@@ -14,7 +14,7 @@ import {
 import {
   generateTradeProposals, parseBudget, formatBudget, type TradeProposal,
 } from "@/lib/trades";
-import { initializeContracts, calculateMarketValue, runContractCycle as runCycle } from "@/lib/contracts";
+import { initializeContracts, calculateMarketValue, payrollOf, runContractCycle as runCycle, type ContractAction } from "@/lib/contracts";
 
 const STORAGE_KEY = "eden_league_state_v6";
 const LEGACY_STORAGE_KEYS = ["eden_league_state_v5", "eden_league_state_v4", "eden_league_state_v3", "eden_league_state_v2", "eden_league_state_v1"];
