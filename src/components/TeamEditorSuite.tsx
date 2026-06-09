@@ -47,7 +47,9 @@ export function TeamEditorSuite() {
     state, updateBudget, updatePlayer,
     setInjuryWeeks, setSuspensionWeeks, addPlayer, removePlayer, renameTeam,
     setLineupSlot, setFormation, autoFillLineup,
+    setSalary, setContractYears,
   } = useLeague();
+  const contractEditable = CONTRACT_EXEMPT_TEAMS.has(team);
   const [team, setTeam] = useState(state.teamOrder[0]);
   const [nameDraft, setNameDraft] = useState(team);
   const [formationDraft, setFormationDraft] = useState("3-3-2");
