@@ -30,12 +30,6 @@ const NUM_COLS: { key: AttrKey; label: string }[] = [
   { key: "AER", label: "AER" },
 ];
 
-const GROUP_COLOR: Record<string, string> = {
-  GK: "bg-amber-500/15 border-amber-500/40",
-  DF: "bg-sky-500/15 border-sky-500/40",
-  MF: "bg-emerald-500/15 border-emerald-500/40",
-  ST: "bg-rose-500/15 border-rose-500/40",
-};
 
 function weeksLabel(weeks: number): string {
   if (weeks >= SEASON_ENDING_WEEKS) return "Season";
