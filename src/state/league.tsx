@@ -46,6 +46,8 @@ export interface LeaguePlayer {
   injuryWeeks: number; // 0 = healthy; SEASON_ENDING_WEEKS = out for season
   suspensionWeeks: number; // 0 = not suspended
   yellowLog: number[]; // weeks in which unpunished yellows were received
+  salary: number; // annual salary in $M (contract layer)
+  contractYears: number; // years remaining on contract
   rating: number; FIN: number; SHO: number; PAS: number; VIS: number; DRI: number;
   PAC: number; STA: number; DEF: number; TAC: number; POS_attr: number; COM: number;
   WR: number; AGG: number; STR: number; AER: number;
@@ -56,9 +58,10 @@ export interface LeagueTeam {
   tactical_style: string;
   budget: string;
   morale: number; // 0–100, baseline 50
-  formation: string; // e.g. "3-3-2" (DEF-MID-ATT, GK implicit)
+  formation: string; // e.g. "3-3-2" (outfield rows, GK implicit; digits sum to 8)
   lineup: string[]; // ordered slot assignments (player names; "" = empty)
   players: LeaguePlayer[];
+  salaryBudget: number; // payroll cap space (set to the global hard cap)
 }
 
 export interface MatchRecord {
@@ -101,6 +104,9 @@ export interface LeagueState {
   playoffs?: PlayoffsState;
   tradeProposals: TradeProposal[];
   undoStack: string[]; // serialized prior states (universal undo)
+  salaryCap: number; // league-wide hard salary cap ($M)
+  freeAgents: LeaguePlayer[]; // unattached players available for free signing
+  contractsInitialized: boolean; // first-boot compliance setup complete
 }
 
 export interface StandingRow {
