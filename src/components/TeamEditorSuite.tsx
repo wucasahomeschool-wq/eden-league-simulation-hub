@@ -219,6 +219,38 @@ export function TeamEditorSuite() {
                   <td className="px-0.5 py-1 text-center">
                     <span className="font-mono tabular-nums text-muted-foreground">{p.morale.toFixed(0)}</span>
                   </td>
+                  <td className="px-0.5 py-1 text-center">
+                    {contractEditable ? (
+                      <input
+                        type="number"
+                        step="0.1"
+                        min={0}
+                        value={p.salary ?? 0}
+                        onChange={(e) => setSalary(team, idx, parseFloat(e.target.value) || 0)}
+                        className="w-14 rounded border border-transparent bg-transparent px-1 py-0.5 text-center tabular-nums hover:border-border focus:border-ring focus:bg-card focus:outline-none"
+                      />
+                    ) : (
+                      <span title="AI-managed contract (locked)" className="inline-block w-14 cursor-not-allowed rounded bg-muted px-1 py-0.5 text-center font-mono tabular-nums text-muted-foreground">
+                        {(p.salary ?? 0).toFixed(1)}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-0.5 py-1 text-center">
+                    {contractEditable ? (
+                      <input
+                        type="number"
+                        min={0}
+                        max={10}
+                        value={p.contractYears ?? 0}
+                        onChange={(e) => setContractYears(team, idx, parseInt(e.target.value) || 0)}
+                        className="w-11 rounded border border-transparent bg-transparent px-1 py-0.5 text-center tabular-nums hover:border-border focus:border-ring focus:bg-card focus:outline-none"
+                      />
+                    ) : (
+                      <span title="AI-managed contract (locked)" className="inline-block w-11 cursor-not-allowed rounded bg-muted px-1 py-0.5 text-center font-mono tabular-nums text-muted-foreground">
+                        {p.contractYears ?? 0}
+                      </span>
+                    )}
+                  </td>
                   {NUM_COLS.map((c) =>
                     c.key === "rating" ? (
                       <td key={c.key} className="px-0.5 py-1 text-center">
