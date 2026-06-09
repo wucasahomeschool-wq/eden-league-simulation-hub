@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import {
-  useLeague, ATTR_KEYS, isPlayerOut, SEASON_ENDING_WEEKS, positionGroup,
-  buildLineupSlots, type AttrKey,
+  useLeague, ATTR_KEYS, isPlayerOut, SEASON_ENDING_WEEKS,
+  buildLineupSlots, isValidFormation, CONTRACT_EDITABLE_TEAMS, type AttrKey,
+  type LineupSlot,
 } from "@/state/league";
 import { moraleLabel } from "@/lib/morale";
 import { Button } from "@/components/ui/button";
