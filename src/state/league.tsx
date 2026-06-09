@@ -1176,6 +1176,48 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       })),
     refreshTradeProposals: () =>
       update((prev) => ({ ...prev, tradeProposals: generateTradeProposals(prev) })),
+    setSalary: (team, index, salary) =>
+      update((prev) => {
+        const players = prev.teams[team].players.map((p, i) =>
+          i === index ? { ...p, salary: Math.max(0, Math.round(salary * 100) / 100) } : p
+        );
+        return { ...prev, teams: { ...prev.teams, [team]: { ...prev.teams[team], players } } };
+      }),
+    setContractYears: (team, index, years) =>
+      update((prev) => {
+        const players = prev.teams[team].players.map((p, i) =>
+          i === index ? { ...p, contractYears: Math.max(0, Math.floor(years)) } : p
+        );
+        return { ...prev, teams: { ...prev.teams, [team]: { ...prev.teams[team], players } } };
+      }),
+    signFreeAgent: (team, freeAgentName) =>
+      update((prev) => {
+        const fa = (prev.freeAgents ?? []).find((p) => p.name === freeAgentName);
+        if (!fa) return prev;
+        const t = prev.teams[team];
+        const signing: LeaguePlayer = {
+          ...fa, starter: false,
+          salary: calculateMarketValue(fa.rating), contractYears: 1,
+        };
+        const post = [...t.players, signing];
+        const cap = prev.salaryCap ?? Infinity;
+        if (post.reduce((s, p) => s + (p.salary ?? 0), 0) > cap + 0.001) return prev; // cap lock
+        return {
+          ...prev,
+          freeAgents: (prev.freeAgents ?? []).filter((p) => p.name !== freeAgentName),
+          teams: { ...prev.teams, [team]: syncStarters({ ...t, players: post }) },
+        };
+      }),
+    runContractCycle: () => {
+      const r = runCycle(state);
+      update(() => ({
+        ...state,
+        teams: r.teams,
+        freeAgents: r.freeAgents,
+        salaryCap: r.salaryCap,
+      }));
+      return r.actions;
+    },
     resetLeague: () => setState(initState()),
   };
 
