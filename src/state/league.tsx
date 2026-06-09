@@ -142,32 +142,45 @@ export function positionGroup(pos: string): PosGroup {
   return "MF";
 }
 
-export function parseFormation(f: string): { def: number; mid: number; att: number } {
-  const parts = (f || "").split("-").map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n));
-  if (parts.length === 3 && parts[0] + parts[1] + parts[2] === 8) {
-    return { def: parts[0], mid: parts[1], att: parts[2] };
-  }
-  return { def: 3, mid: 3, att: 2 };
+// A formation is any sequence of outfield-row sizes whose digits sum to 8
+// (9 minus the goalkeeper). e.g. "3-3-2", "4-4", "2-3-2-1", "1-2-3-2".
+export function parseFormation(f: string): number[] {
+  const parts = (f || "").split("-").map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n) && n > 0);
+  if (parts.length >= 1 && parts.reduce((s, n) => s + n, 0) === 8) return parts;
+  return [3, 3, 2];
 }
 
-export interface LineupSlot { group: PosGroup; label: string; }
+export function isValidFormation(f: string): boolean {
+  const parts = (f || "").split("-").map((n) => parseInt(n.trim(), 10));
+  return parts.length >= 1 && parts.every((n) => !isNaN(n) && n > 0) && parts.reduce((s, n) => s + n, 0) === 8;
+}
+
+// Slots: a GK slot (line 0) plus one generic outfield slot per formation unit.
+// Any player may fill any outfield slot, so the group is "OUT".
+export interface LineupSlot { group: PosGroup | "OUT"; label: string; line: number; }
 export function buildLineupSlots(formation: string): LineupSlot[] {
-  const { def, mid, att } = parseFormation(formation);
-  const slots: LineupSlot[] = [{ group: "GK", label: "GK" }];
-  for (let i = 0; i < def; i++) slots.push({ group: "DF", label: `DF${i + 1}` });
-  for (let i = 0; i < mid; i++) slots.push({ group: "MF", label: `MF${i + 1}` });
-  for (let i = 0; i < att; i++) slots.push({ group: "ST", label: `ST${i + 1}` });
+  const rows = parseFormation(formation);
+  const slots: LineupSlot[] = [{ group: "GK", label: "GK", line: 0 }];
+  rows.forEach((count, r) => {
+    for (let i = 0; i < count; i++) {
+      slots.push({ group: "OUT", label: `${r + 1}.${i + 1}`, line: r + 1 });
+    }
+  });
   return slots;
 }
 
-// Pick a sensible default lineup from the available roster honoring slot groups.
+// Pick a sensible default lineup from the available roster. The GK slot prefers a
+// goalkeeper; every other slot takes the highest-rated remaining healthy player.
 export function buildDefaultLineup(players: LeaguePlayer[], formation: string): string[] {
   const slots = buildLineupSlots(formation);
   const used = new Set<string>();
   const ranked = [...players].sort((a, b) => b.rating - a.rating);
   const lineup: string[] = [];
   for (const slot of slots) {
-    let pick = ranked.find((p) => !used.has(p.name) && !isPlayerOut(p) && positionGroup(p.position) === slot.group);
+    let pick: LeaguePlayer | undefined;
+    if (slot.group === "GK") {
+      pick = ranked.find((p) => !used.has(p.name) && !isPlayerOut(p) && positionGroup(p.position) === "GK");
+    }
     if (!pick) pick = ranked.find((p) => !used.has(p.name) && !isPlayerOut(p));
     if (!pick) pick = ranked.find((p) => !used.has(p.name));
     if (pick) { used.add(pick.name); lineup.push(pick.name); }
