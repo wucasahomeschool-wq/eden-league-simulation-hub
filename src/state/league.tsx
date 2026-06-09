@@ -14,9 +14,10 @@ import {
 import {
   generateTradeProposals, parseBudget, formatBudget, type TradeProposal,
 } from "@/lib/trades";
+import { initializeContracts, calculateMarketValue, runContractCycle as runCycle } from "@/lib/contracts";
 
-const STORAGE_KEY = "eden_league_state_v5";
-const LEGACY_STORAGE_KEYS = ["eden_league_state_v4", "eden_league_state_v3", "eden_league_state_v2", "eden_league_state_v1"];
+const STORAGE_KEY = "eden_league_state_v6";
+const LEGACY_STORAGE_KEYS = ["eden_league_state_v5", "eden_league_state_v4", "eden_league_state_v3", "eden_league_state_v2", "eden_league_state_v1"];
 
 // Transfer window: the automatic trade engine only runs at the end of regular
 // season match weeks (1–12).
@@ -29,7 +30,7 @@ const YELLOW_SUSPENSION = 1;
 const RED_SUSPENSION = 2;
 
 export const DEFAULT_FORMATION = "3-3-2";
-const MAX_UNDO = 60;
+const MAX_UNDO = 1000;
 
 export const ATTR_KEYS = [
   "rating", "FIN", "SHO", "PAS", "VIS", "DRI", "PAC", "STA",
@@ -189,6 +190,7 @@ export function blankPlayer(): LeaguePlayer {
     name: "New Player", position: "CM", starter: false,
     age: 24, morale: MORALE_BASELINE,
     injuryWeeks: 0, suspensionWeeks: 0, yellowLog: [],
+    salary: 5.0, contractYears: 2,
     rating: 5.0, FIN: 5.0, SHO: 5.0, PAS: 5.0, VIS: 5.0, DRI: 5.0,
     PAC: 5.0, STA: 5.0, DEF: 5.0, TAC: 5.0, POS_attr: 5.0, COM: 5.0,
     WR: 5.0, AGG: 5.0, STR: 5.0, AER: 5.0,
@@ -202,6 +204,7 @@ export function youthPlayer(): LeaguePlayer {
     name: "Youth Academy Call-up", position: "CM", starter: true,
     age: 18, morale: MORALE_BASELINE,
     injuryWeeks: 0, suspensionWeeks: 0, yellowLog: [],
+    salary: 1.0, contractYears: 1,
     rating: 1.0, FIN: 1.0, SHO: 1.0, PAS: 1.0, VIS: 1.0, DRI: 1.0,
     PAC: 1.0, STA: 1.0, DEF: 1.0, TAC: 1.0, POS_attr: 1.0, COM: 1.0,
     WR: 1.0, AGG: 1.0, STR: 1.0, AER: 1.0,
@@ -233,6 +236,8 @@ function initState(): LeagueState {
         injuryWeeks: 0,
         suspensionWeeks: 0,
         yellowLog: [],
+        salary: 0,
+        contractYears: 0,
         rating: p.rating, FIN: p.FIN, SHO: p.SHO, PAS: p.PAS, VIS: p.VIS, DRI: p.DRI,
         PAC: p.PAC, STA: p.STA, DEF: p.DEF, TAC: p.TAC, POS_attr: p.POS_attr, COM: p.COM,
         WR: p.WR, AGG: p.AGG, STR: p.STR, AER: p.AER,
@@ -249,6 +254,7 @@ function initState(): LeagueState {
       formation: DEFAULT_FORMATION,
       lineup,
       players,
+      salaryBudget: 0,
     });
   }
   const fixtures: FixtureEntry[] = INITIAL_SCHEDULE.map((f, i) => ({
@@ -257,9 +263,13 @@ function initState(): LeagueState {
     home: f.home,
     away: f.away,
   }));
+  // First-time compliance: pay every player their market value, assign a 1–4yr
+  // deal and declare the highest club payroll as the global Hard Salary Cap.
+  const { teams: capTeams, salaryCap } = initializeContracts(teams, teamOrder);
   return {
-    currentWeek: 1, season: 1, teamOrder, teams, fixtures,
+    currentWeek: 1, season: 1, teamOrder, teams: capTeams, fixtures,
     results: {}, payloads: {}, tradeProposals: [], undoStack: [],
+    salaryCap, freeAgents: [], contractsInitialized: true,
   };
 }
 
