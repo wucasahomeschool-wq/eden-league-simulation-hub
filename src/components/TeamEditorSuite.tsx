@@ -175,6 +175,8 @@ export function TeamEditorSuite() {
               <th className="px-2 py-2 text-center">POS</th>
               <th className="px-1.5 py-2 text-center">AGE</th>
               <th className="px-1.5 py-2 text-center">MOR</th>
+              <th className="px-1.5 py-2 text-center">SAL$M</th>
+              <th className="px-1.5 py-2 text-center">YRS</th>
               {NUM_COLS.map((c) => <th key={c.key} className="px-1.5 py-2 text-center">{c.label}</th>)}
               <th className="px-2 py-2 text-center">HEALTH</th>
               <th className="px-1.5 py-2 text-center">INJ</th>
