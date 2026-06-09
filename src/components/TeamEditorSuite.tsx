@@ -49,7 +49,6 @@ export function TeamEditorSuite() {
     setLineupSlot, setFormation, autoFillLineup,
     setSalary, setContractYears,
   } = useLeague();
-  const contractEditable = CONTRACT_EXEMPT_TEAMS.has(team);
   const [team, setTeam] = useState(state.teamOrder[0]);
   const [nameDraft, setNameDraft] = useState(team);
   const [formationDraft, setFormationDraft] = useState("3-3-2");
@@ -65,6 +64,8 @@ export function TeamEditorSuite() {
   const t = state.teams[team];
   if (!t) return null;
 
+  const contractEditable = CONTRACT_EXEMPT_TEAMS.has(team);
+  const payroll = t.players.reduce((s, p) => s + (p.salary ?? 0), 0);
   const slots = buildLineupSlots(t.formation);
   const starterCount = t.lineup.filter((n) => {
     const p = t.players.find((x) => x.name === n);
