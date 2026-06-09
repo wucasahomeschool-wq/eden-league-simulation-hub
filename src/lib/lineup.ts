@@ -56,9 +56,6 @@ export function validateLineup(team: LeagueTeam): LineupValidation {
       return;
     }
     healthyStarters++;
-    if (positionGroup(player.position) !== slot.group) {
-      errors.push(`${team.name}: ${player.name} (${player.position}) does not fit the ${slot.group} slot ${slot.label}.`);
-    }
   });
 
   return {
