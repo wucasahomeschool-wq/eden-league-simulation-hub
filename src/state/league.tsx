@@ -14,9 +14,10 @@ import {
 import {
   generateTradeProposals, parseBudget, formatBudget, type TradeProposal,
 } from "@/lib/trades";
+import { initializeContracts, calculateMarketValue, payrollOf, runContractCycle as runCycle, type ContractAction } from "@/lib/contracts";
 
-const STORAGE_KEY = "eden_league_state_v5";
-const LEGACY_STORAGE_KEYS = ["eden_league_state_v4", "eden_league_state_v3", "eden_league_state_v2", "eden_league_state_v1"];
+const STORAGE_KEY = "eden_league_state_v6";
+const LEGACY_STORAGE_KEYS = ["eden_league_state_v5", "eden_league_state_v4", "eden_league_state_v3", "eden_league_state_v2", "eden_league_state_v1"];
 
 // Transfer window: the automatic trade engine only runs at the end of regular
 // season match weeks (1–12).
@@ -29,7 +30,7 @@ const YELLOW_SUSPENSION = 1;
 const RED_SUSPENSION = 2;
 
 export const DEFAULT_FORMATION = "3-3-2";
-const MAX_UNDO = 60;
+const MAX_UNDO = 1000;
 
 export const ATTR_KEYS = [
   "rating", "FIN", "SHO", "PAS", "VIS", "DRI", "PAC", "STA",
@@ -46,6 +47,8 @@ export interface LeaguePlayer {
   injuryWeeks: number; // 0 = healthy; SEASON_ENDING_WEEKS = out for season
   suspensionWeeks: number; // 0 = not suspended
   yellowLog: number[]; // weeks in which unpunished yellows were received
+  salary: number; // annual salary in $M (contract layer)
+  contractYears: number; // years remaining on contract
   rating: number; FIN: number; SHO: number; PAS: number; VIS: number; DRI: number;
   PAC: number; STA: number; DEF: number; TAC: number; POS_attr: number; COM: number;
   WR: number; AGG: number; STR: number; AER: number;
@@ -56,9 +59,10 @@ export interface LeagueTeam {
   tactical_style: string;
   budget: string;
   morale: number; // 0–100, baseline 50
-  formation: string; // e.g. "3-3-2" (DEF-MID-ATT, GK implicit)
+  formation: string; // e.g. "3-3-2" (outfield rows, GK implicit; digits sum to 8)
   lineup: string[]; // ordered slot assignments (player names; "" = empty)
   players: LeaguePlayer[];
+  salaryBudget: number; // payroll cap space (set to the global hard cap)
 }
 
 export interface MatchRecord {
@@ -101,6 +105,9 @@ export interface LeagueState {
   playoffs?: PlayoffsState;
   tradeProposals: TradeProposal[];
   undoStack: string[]; // serialized prior states (universal undo)
+  salaryCap: number; // league-wide hard salary cap ($M)
+  freeAgents: LeaguePlayer[]; // unattached players available for free signing
+  contractsInitialized: boolean; // first-boot compliance setup complete
 }
 
 export interface StandingRow {
@@ -135,32 +142,45 @@ export function positionGroup(pos: string): PosGroup {
   return "MF";
 }
 
-export function parseFormation(f: string): { def: number; mid: number; att: number } {
-  const parts = (f || "").split("-").map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n));
-  if (parts.length === 3 && parts[0] + parts[1] + parts[2] === 8) {
-    return { def: parts[0], mid: parts[1], att: parts[2] };
-  }
-  return { def: 3, mid: 3, att: 2 };
+// A formation is any sequence of outfield-row sizes whose digits sum to 8
+// (9 minus the goalkeeper). e.g. "3-3-2", "4-4", "2-3-2-1", "1-2-3-2".
+export function parseFormation(f: string): number[] {
+  const parts = (f || "").split("-").map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n) && n > 0);
+  if (parts.length >= 1 && parts.reduce((s, n) => s + n, 0) === 8) return parts;
+  return [3, 3, 2];
 }
 
-export interface LineupSlot { group: PosGroup; label: string; }
+export function isValidFormation(f: string): boolean {
+  const parts = (f || "").split("-").map((n) => parseInt(n.trim(), 10));
+  return parts.length >= 1 && parts.every((n) => !isNaN(n) && n > 0) && parts.reduce((s, n) => s + n, 0) === 8;
+}
+
+// Slots: a GK slot (line 0) plus one generic outfield slot per formation unit.
+// Any player may fill any outfield slot, so the group is "OUT".
+export interface LineupSlot { group: PosGroup | "OUT"; label: string; line: number; }
 export function buildLineupSlots(formation: string): LineupSlot[] {
-  const { def, mid, att } = parseFormation(formation);
-  const slots: LineupSlot[] = [{ group: "GK", label: "GK" }];
-  for (let i = 0; i < def; i++) slots.push({ group: "DF", label: `DF${i + 1}` });
-  for (let i = 0; i < mid; i++) slots.push({ group: "MF", label: `MF${i + 1}` });
-  for (let i = 0; i < att; i++) slots.push({ group: "ST", label: `ST${i + 1}` });
+  const rows = parseFormation(formation);
+  const slots: LineupSlot[] = [{ group: "GK", label: "GK", line: 0 }];
+  rows.forEach((count, r) => {
+    for (let i = 0; i < count; i++) {
+      slots.push({ group: "OUT", label: `${r + 1}.${i + 1}`, line: r + 1 });
+    }
+  });
   return slots;
 }
 
-// Pick a sensible default lineup from the available roster honoring slot groups.
+// Pick a sensible default lineup from the available roster. The GK slot prefers a
+// goalkeeper; every other slot takes the highest-rated remaining healthy player.
 export function buildDefaultLineup(players: LeaguePlayer[], formation: string): string[] {
   const slots = buildLineupSlots(formation);
   const used = new Set<string>();
   const ranked = [...players].sort((a, b) => b.rating - a.rating);
   const lineup: string[] = [];
   for (const slot of slots) {
-    let pick = ranked.find((p) => !used.has(p.name) && !isPlayerOut(p) && positionGroup(p.position) === slot.group);
+    let pick: LeaguePlayer | undefined;
+    if (slot.group === "GK") {
+      pick = ranked.find((p) => !used.has(p.name) && !isPlayerOut(p) && positionGroup(p.position) === "GK");
+    }
     if (!pick) pick = ranked.find((p) => !used.has(p.name) && !isPlayerOut(p));
     if (!pick) pick = ranked.find((p) => !used.has(p.name));
     if (pick) { used.add(pick.name); lineup.push(pick.name); }
@@ -183,6 +203,7 @@ export function blankPlayer(): LeaguePlayer {
     name: "New Player", position: "CM", starter: false,
     age: 24, morale: MORALE_BASELINE,
     injuryWeeks: 0, suspensionWeeks: 0, yellowLog: [],
+    salary: 5.0, contractYears: 2,
     rating: 5.0, FIN: 5.0, SHO: 5.0, PAS: 5.0, VIS: 5.0, DRI: 5.0,
     PAC: 5.0, STA: 5.0, DEF: 5.0, TAC: 5.0, POS_attr: 5.0, COM: 5.0,
     WR: 5.0, AGG: 5.0, STR: 5.0, AER: 5.0,
@@ -196,6 +217,7 @@ export function youthPlayer(): LeaguePlayer {
     name: "Youth Academy Call-up", position: "CM", starter: true,
     age: 18, morale: MORALE_BASELINE,
     injuryWeeks: 0, suspensionWeeks: 0, yellowLog: [],
+    salary: 1.0, contractYears: 1,
     rating: 1.0, FIN: 1.0, SHO: 1.0, PAS: 1.0, VIS: 1.0, DRI: 1.0,
     PAC: 1.0, STA: 1.0, DEF: 1.0, TAC: 1.0, POS_attr: 1.0, COM: 1.0,
     WR: 1.0, AGG: 1.0, STR: 1.0, AER: 1.0,
@@ -227,6 +249,8 @@ function initState(): LeagueState {
         injuryWeeks: 0,
         suspensionWeeks: 0,
         yellowLog: [],
+        salary: 0,
+        contractYears: 0,
         rating: p.rating, FIN: p.FIN, SHO: p.SHO, PAS: p.PAS, VIS: p.VIS, DRI: p.DRI,
         PAC: p.PAC, STA: p.STA, DEF: p.DEF, TAC: p.TAC, POS_attr: p.POS_attr, COM: p.COM,
         WR: p.WR, AGG: p.AGG, STR: p.STR, AER: p.AER,
@@ -243,6 +267,7 @@ function initState(): LeagueState {
       formation: DEFAULT_FORMATION,
       lineup,
       players,
+      salaryBudget: 0,
     });
   }
   const fixtures: FixtureEntry[] = INITIAL_SCHEDULE.map((f, i) => ({
@@ -251,9 +276,13 @@ function initState(): LeagueState {
     home: f.home,
     away: f.away,
   }));
+  // First-time compliance: pay every player their market value, assign a 1–4yr
+  // deal and declare the highest club payroll as the global Hard Salary Cap.
+  const { teams: capTeams, salaryCap } = initializeContracts(teams, teamOrder);
   return {
-    currentWeek: 1, season: 1, teamOrder, teams, fixtures,
+    currentWeek: 1, season: 1, teamOrder, teams: capTeams, fixtures,
     results: {}, payloads: {}, tradeProposals: [], undoStack: [],
+    salaryCap, freeAgents: [], contractsInitialized: true,
   };
 }
 
@@ -270,6 +299,8 @@ function normalize(state: LeagueState): LeagueState {
         yellowLog: p.yellowLog ?? [],
         morale: p.morale ?? MORALE_BASELINE,
         age: p.age ?? 25,
+        salary: p.salary ?? calculateMarketValue(p.rating ?? 5),
+        contractYears: p.contractYears ?? 0,
       };
       const withAge = player.age ? player : { ...player, age: computeStartingAge(player) };
       return { ...withAge, rating: computeOverall(withAge) };
@@ -289,7 +320,17 @@ function normalize(state: LeagueState): LeagueState {
       formation,
       lineup,
       players,
+      salaryBudget: t.salaryBudget ?? 0,
     });
+  }
+  let salaryCap = state.salaryCap ?? 0;
+  let contractsInitialized = state.contractsInitialized ?? false;
+  let outTeams = teams;
+  if (!contractsInitialized || salaryCap <= 0) {
+    const init = initializeContracts(teams, state.teamOrder);
+    outTeams = init.teams;
+    salaryCap = init.salaryCap;
+    contractsInitialized = true;
   }
   return {
     ...state,
@@ -297,7 +338,10 @@ function normalize(state: LeagueState): LeagueState {
     tradeProposals: state.tradeProposals ?? [],
     payloads: state.payloads ?? {},
     undoStack: state.undoStack ?? [],
-    teams,
+    teams: outTeams,
+    salaryCap,
+    freeAgents: state.freeAgents ?? [],
+    contractsInitialized,
   };
 }
 
@@ -675,6 +719,10 @@ interface LeagueContextValue {
   executeManualTrade: (teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashAReceives: number, cashBReceives: number) => void;
   declineTrade: (proposalId: string) => void;
   refreshTradeProposals: () => void;
+  setSalary: (team: string, index: number, salary: number) => void;
+  setContractYears: (team: string, index: number, years: number) => void;
+  signFreeAgent: (team: string, freeAgentName: string) => void;
+  runContractCycle: () => ContractAction[];
   resetLeague: () => void;
   standings: StandingRow[];
   leaderboards: Leaderboards;
@@ -683,17 +731,18 @@ interface LeagueContextValue {
 const LeagueContext = createContext<LeagueContextValue | null>(null);
 
 // Auto-promote acquired players into the lineup if they outrate the current
-// starter in their position group (feature: new acquisitions take a spot).
+// weakest starter. Goalkeepers target the GK slot; outfielders target any
+// outfield slot (any player can play any outfield position).
 function autoPromote(team: LeagueTeam, incoming: LeaguePlayer[]): LeagueTeam {
   const slots = buildLineupSlots(team.formation);
   const lineup = [...team.lineup];
   for (const inc of incoming) {
-    const g = positionGroup(inc.position);
     if (lineup.includes(inc.name)) continue; // already starting
+    const targetGroup: LineupSlot["group"] = positionGroup(inc.position) === "GK" ? "GK" : "OUT";
     let worstIdx = -1;
     let worstRating = Infinity;
     slots.forEach((s, i) => {
-      if (s.group !== g) return;
+      if (s.group !== targetGroup) return;
       const cur = team.players.find((p) => p.name === lineup[i]);
       const r = cur ? cur.rating : -1;
       if (r < worstRating) { worstRating = r; worstIdx = i; }
@@ -768,6 +817,11 @@ function moveTrade(
 
   aTeam = syncStarters(aTeam);
   bTeam = syncStarters(bTeam);
+
+  // The Cap Lock: salaries travel with players (contract preservation). Block any
+  // trade that pushes either club's payroll over the league Hard Salary Cap.
+  const cap = prev.salaryCap ?? Infinity;
+  if (payrollOf(aTeam) > cap + 0.001 || payrollOf(bTeam) > cap + 0.001) return prev;
 
   return { ...prev, teams: { ...prev.teams, [aName]: aTeam, [bName]: bTeam } };
 }
@@ -1135,6 +1189,48 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       })),
     refreshTradeProposals: () =>
       update((prev) => ({ ...prev, tradeProposals: generateTradeProposals(prev) })),
+    setSalary: (team, index, salary) =>
+      update((prev) => {
+        const players = prev.teams[team].players.map((p, i) =>
+          i === index ? { ...p, salary: Math.max(0, Math.round(salary * 100) / 100) } : p
+        );
+        return { ...prev, teams: { ...prev.teams, [team]: { ...prev.teams[team], players } } };
+      }),
+    setContractYears: (team, index, years) =>
+      update((prev) => {
+        const players = prev.teams[team].players.map((p, i) =>
+          i === index ? { ...p, contractYears: Math.max(0, Math.floor(years)) } : p
+        );
+        return { ...prev, teams: { ...prev.teams, [team]: { ...prev.teams[team], players } } };
+      }),
+    signFreeAgent: (team, freeAgentName) =>
+      update((prev) => {
+        const fa = (prev.freeAgents ?? []).find((p) => p.name === freeAgentName);
+        if (!fa) return prev;
+        const t = prev.teams[team];
+        const signing: LeaguePlayer = {
+          ...fa, starter: false,
+          salary: calculateMarketValue(fa.rating), contractYears: 1,
+        };
+        const post = [...t.players, signing];
+        const cap = prev.salaryCap ?? Infinity;
+        if (post.reduce((s, p) => s + (p.salary ?? 0), 0) > cap + 0.001) return prev; // cap lock
+        return {
+          ...prev,
+          freeAgents: (prev.freeAgents ?? []).filter((p) => p.name !== freeAgentName),
+          teams: { ...prev.teams, [team]: syncStarters({ ...t, players: post }) },
+        };
+      }),
+    runContractCycle: () => {
+      const r = runCycle(state);
+      update(() => ({
+        ...state,
+        teams: r.teams,
+        freeAgents: r.freeAgents,
+        salaryCap: r.salaryCap,
+      }));
+      return r.actions;
+    },
     resetLeague: () => setState(initState()),
   };
 

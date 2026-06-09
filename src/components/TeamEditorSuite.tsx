@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import {
-  useLeague, ATTR_KEYS, isPlayerOut, SEASON_ENDING_WEEKS, positionGroup,
-  buildLineupSlots, type AttrKey,
+  useLeague, ATTR_KEYS, isPlayerOut, SEASON_ENDING_WEEKS,
+  buildLineupSlots, isValidFormation, type AttrKey, type LineupSlot,
 } from "@/state/league";
+import { CONTRACT_EXEMPT_TEAMS } from "@/lib/contracts";
 import { moraleLabel } from "@/lib/morale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,12 +30,6 @@ const NUM_COLS: { key: AttrKey; label: string }[] = [
   { key: "AER", label: "AER" },
 ];
 
-const GROUP_COLOR: Record<string, string> = {
-  GK: "bg-amber-500/15 border-amber-500/40",
-  DF: "bg-sky-500/15 border-sky-500/40",
-  MF: "bg-emerald-500/15 border-emerald-500/40",
-  ST: "bg-rose-500/15 border-rose-500/40",
-};
 
 function weeksLabel(weeks: number): string {
   if (weeks >= SEASON_ENDING_WEEKS) return "Season";
@@ -46,6 +41,7 @@ export function TeamEditorSuite() {
     state, updateBudget, updatePlayer,
     setInjuryWeeks, setSuspensionWeeks, addPlayer, removePlayer, renameTeam,
     setLineupSlot, setFormation, autoFillLineup,
+    setSalary, setContractYears,
   } = useLeague();
   const [team, setTeam] = useState(state.teamOrder[0]);
   const [nameDraft, setNameDraft] = useState(team);
@@ -62,6 +58,8 @@ export function TeamEditorSuite() {
   const t = state.teams[team];
   if (!t) return null;
 
+  const contractEditable = CONTRACT_EXEMPT_TEAMS.has(team);
+  const payroll = t.players.reduce((s, p) => s + (p.salary ?? 0), 0);
   const slots = buildLineupSlots(t.formation);
   const starterCount = t.lineup.filter((n) => {
     const p = t.players.find((x) => x.name === n);
@@ -128,45 +126,46 @@ export function TeamEditorSuite() {
           <div>Tactical style: <span className="font-semibold text-foreground">{t.tactical_style}</span></div>
           <div>Team Morale: <span className={`font-semibold ${moraleTone}`}>{t.morale.toFixed(0)}% · {ml.text}</span></div>
           <div>Active starters: <span className={starterCount === slots.length ? "font-semibold text-success" : "font-semibold text-destructive"}>{starterCount}/{slots.length}</span></div>
+          <div>Payroll: <span className={`font-semibold ${payroll > (state.salaryCap ?? Infinity) + 0.001 ? "text-destructive" : "text-foreground"}`}>${payroll.toFixed(1)}M / ${(state.salaryCap ?? 0).toFixed(1)}M cap</span></div>
+          <div className="text-[10px]">{contractEditable ? "Contracts: manual (editable)" : "Contracts: AI-managed (locked)"}</div>
         </div>
       </div>
 
       {/* Formation pitch */}
-      <div className="mb-6 rounded-xl border bg-panel/40 p-4">
+      <div className="mb-6 rounded-xl border border-border bg-card/60 p-4 shadow-lg">
         <div className="mb-3 flex flex-wrap items-end gap-3">
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Formation (DEF-MID-ATT, must total 8 outfielders)
+              Formation (any rows; digits must total 8 outfielders)
             </label>
             <div className="flex gap-2">
               <Input
                 value={formationDraft}
                 onChange={(e) => setFormationDraft(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && setFormation(team, formationDraft)}
+                onKeyDown={(e) => e.key === "Enter" && isValidFormation(formationDraft) && setFormation(team, formationDraft)}
                 placeholder="3-3-2"
-                className="h-9 w-28 bg-card font-mono"
+                className="h-9 w-32 bg-card font-mono"
               />
-              <Button size="sm" variant="secondary" onClick={() => setFormation(team, formationDraft)}>
+              <Button size="sm" variant="secondary" disabled={!isValidFormation(formationDraft)} onClick={() => setFormation(team, formationDraft)}>
                 APPLY
               </Button>
               <Button size="sm" variant="outline" onClick={() => autoFillLineup(team)}>
                 AUTO-FILL
               </Button>
             </div>
+            {!isValidFormation(formationDraft) && (
+              <p className="mt-1 text-xs text-destructive">Digits must sum to 8 (e.g. 3-3-2, 4-4, 2-3-2-1, 1-2-3-2).</p>
+            )}
           </div>
           <p className="text-xs text-muted-foreground">
-            A simulation requires a valid 9-man distribution: 1 GK, 3 DF, 3 MF, 2 ST. Each slot only
-            accepts a player from the matching position group.
+            Any player can be slotted into any position. A simulation requires all 9 slots filled with
+            healthy players.
           </p>
         </div>
 
-        <div className="rounded-lg bg-[oklch(0.93_0.04_150)] p-4">
-          <PitchRow slots={slots} group="ST" team={team} t={t} setLineupSlot={setLineupSlot} />
-          <PitchRow slots={slots} group="MF" team={team} t={t} setLineupSlot={setLineupSlot} />
-          <PitchRow slots={slots} group="DF" team={team} t={t} setLineupSlot={setLineupSlot} />
-          <PitchRow slots={slots} group="GK" team={team} t={t} setLineupSlot={setLineupSlot} />
-        </div>
+        <PitchField slots={slots} team={team} t={t} setLineupSlot={setLineupSlot} />
       </div>
+
 
       <div className="overflow-x-auto rounded-xl border bg-card">
         <table className="w-full border-collapse text-xs">
@@ -176,6 +175,8 @@ export function TeamEditorSuite() {
               <th className="px-2 py-2 text-center">POS</th>
               <th className="px-1.5 py-2 text-center">AGE</th>
               <th className="px-1.5 py-2 text-center">MOR</th>
+              <th className="px-1.5 py-2 text-center">SAL$M</th>
+              <th className="px-1.5 py-2 text-center">YRS</th>
               {NUM_COLS.map((c) => <th key={c.key} className="px-1.5 py-2 text-center">{c.label}</th>)}
               <th className="px-2 py-2 text-center">HEALTH</th>
               <th className="px-1.5 py-2 text-center">INJ</th>
@@ -217,6 +218,38 @@ export function TeamEditorSuite() {
                   </td>
                   <td className="px-0.5 py-1 text-center">
                     <span className="font-mono tabular-nums text-muted-foreground">{p.morale.toFixed(0)}</span>
+                  </td>
+                  <td className="px-0.5 py-1 text-center">
+                    {contractEditable ? (
+                      <input
+                        type="number"
+                        step="0.1"
+                        min={0}
+                        value={p.salary ?? 0}
+                        onChange={(e) => setSalary(team, idx, parseFloat(e.target.value) || 0)}
+                        className="w-14 rounded border border-transparent bg-transparent px-1 py-0.5 text-center tabular-nums hover:border-border focus:border-ring focus:bg-card focus:outline-none"
+                      />
+                    ) : (
+                      <span title="AI-managed contract (locked)" className="inline-block w-14 cursor-not-allowed rounded bg-muted px-1 py-0.5 text-center font-mono tabular-nums text-muted-foreground">
+                        {(p.salary ?? 0).toFixed(1)}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-0.5 py-1 text-center">
+                    {contractEditable ? (
+                      <input
+                        type="number"
+                        min={0}
+                        max={10}
+                        value={p.contractYears ?? 0}
+                        onChange={(e) => setContractYears(team, idx, parseInt(e.target.value) || 0)}
+                        className="w-11 rounded border border-transparent bg-transparent px-1 py-0.5 text-center tabular-nums hover:border-border focus:border-ring focus:bg-card focus:outline-none"
+                      />
+                    ) : (
+                      <span title="AI-managed contract (locked)" className="inline-block w-11 cursor-not-allowed rounded bg-muted px-1 py-0.5 text-center font-mono tabular-nums text-muted-foreground">
+                        {p.contractYears ?? 0}
+                      </span>
+                    )}
                   </td>
                   {NUM_COLS.map((c) =>
                     c.key === "rating" ? (
@@ -323,45 +356,70 @@ export function TeamEditorSuite() {
   );
 }
 
-function PitchRow({
-  slots, group, team, t, setLineupSlot,
+function PitchField({
+  slots, team, t, setLineupSlot,
 }: {
-  slots: { group: string; label: string }[];
-  group: string;
+  slots: LineupSlot[];
   team: string;
   t: { players: { name: string; position: string }[]; lineup: string[] };
   setLineupSlot: (team: string, slot: number, name: string) => void;
 }) {
-  const indices = slots
-    .map((s, i) => ({ s, i }))
-    .filter(({ s }) => s.group === group);
-  if (!indices.length) return null;
+  // Render outfield rows from attack (top) down to defense, GK at the very bottom.
+  const lines = Array.from(new Set(slots.map((s) => s.line))).sort((a, b) => b - a);
 
   return (
-    <div className="mb-3 flex flex-wrap justify-center gap-3 last:mb-0">
-      {indices.map(({ s, i }) => {
-        const current = t.lineup[i] ?? "";
-        const eligible = t.players.filter((p) => positionGroup(p.position) === group);
-        return (
-          <div key={i} className={`w-40 rounded-lg border p-1.5 ${GROUP_COLOR[group] ?? "bg-card"}`}>
-            <div className="mb-1 text-center text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-              {s.label}
+    <div
+      className="relative overflow-hidden rounded-lg border border-emerald-200/40 p-4 shadow-inner"
+      style={{
+        background:
+          "repeating-linear-gradient(0deg, #1f9d4d 0px, #1f9d4d 36px, #178a43 36px, #178a43 72px)",
+      }}
+    >
+      {/* Pitch markings */}
+      <div className="pointer-events-none absolute inset-3 rounded-md border-2 border-white/70" />
+      <div className="pointer-events-none absolute left-3 right-3 top-1/2 h-0 -translate-y-1/2 border-t-2 border-white/70" />
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/70" />
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/80" />
+      <div className="pointer-events-none absolute left-1/2 top-3 h-12 w-40 -translate-x-1/2 border-2 border-t-0 border-white/70" />
+      <div className="pointer-events-none absolute bottom-3 left-1/2 h-12 w-40 -translate-x-1/2 border-2 border-b-0 border-white/70" />
+
+      <div className="relative z-10 flex flex-col gap-4">
+        {lines.map((line) => {
+          const indices = slots.map((s, i) => ({ s, i })).filter(({ s }) => s.line === line);
+          return (
+            <div key={line} className="flex flex-wrap justify-center gap-3">
+              {indices.map(({ s, i }) => {
+                const current = t.lineup[i] ?? "";
+                const isGK = s.group === "GK";
+                return (
+                  <div
+                    key={i}
+                    className={`w-40 rounded-lg border p-1.5 shadow-md backdrop-blur ${
+                      isGK ? "border-amber-300 bg-amber-100/90" : "border-white/60 bg-white/90"
+                    }`}
+                  >
+                    <div className="mb-1 text-center text-[10px] font-bold uppercase tracking-wide text-emerald-900">
+                      {isGK ? "GK" : s.label}
+                    </div>
+                    <Select
+                      value={current || "__none__"}
+                      onValueChange={(v) => setLineupSlot(team, i, v === "__none__" ? "" : v)}
+                    >
+                      <SelectTrigger className="h-8 w-full bg-card text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— empty —</SelectItem>
+                        {t.players.map((p) => (
+                          <SelectItem key={p.name} value={p.name}>{p.name} ({p.position})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })}
             </div>
-            <Select
-              value={current || "__none__"}
-              onValueChange={(v) => setLineupSlot(team, i, v === "__none__" ? "" : v)}
-            >
-              <SelectTrigger className="h-8 w-full bg-card text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">— empty —</SelectItem>
-                {eligible.map((p) => (
-                  <SelectItem key={p.name} value={p.name}>{p.name} ({p.position})</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
