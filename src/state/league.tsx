@@ -706,6 +706,10 @@ interface LeagueContextValue {
   executeManualTrade: (teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashAReceives: number, cashBReceives: number) => void;
   declineTrade: (proposalId: string) => void;
   refreshTradeProposals: () => void;
+  setSalary: (team: string, index: number, salary: number) => void;
+  setContractYears: (team: string, index: number, years: number) => void;
+  signFreeAgent: (team: string, freeAgentName: string) => void;
+  runContractCycle: () => ContractAction[];
   resetLeague: () => void;
   standings: StandingRow[];
   leaderboards: Leaderboards;
