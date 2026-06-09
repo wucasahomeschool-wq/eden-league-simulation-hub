@@ -1,10 +1,10 @@
 // Matchday & Lineup Safety Validation Layer.
-// A legal lineup fills every formation slot with a distinct, healthy player
-// whose position group matches the slot (GK / DF / MF / ST). The default
-// formation requires exactly 1 GK, 3 DF, 3 MF and 2 ST. A sim is blocked until
-// both clubs field a complete, valid 9-man tactical distribution.
+// A legal lineup fills every formation slot with a distinct, healthy player. Any
+// player can play any outfield position, so slots are not position-gated — the
+// only requirements are: every slot filled, no duplicates, all starters healthy,
+// and a pool of at least 9 healthy players.
 import {
-  isPlayerOut, buildLineupSlots, positionGroup, type LeagueTeam,
+  isPlayerOut, buildLineupSlots, type LeagueTeam,
 } from "@/state/league";
 
 export interface LineupValidation {
