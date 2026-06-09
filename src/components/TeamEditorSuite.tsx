@@ -126,6 +126,8 @@ export function TeamEditorSuite() {
           <div>Tactical style: <span className="font-semibold text-foreground">{t.tactical_style}</span></div>
           <div>Team Morale: <span className={`font-semibold ${moraleTone}`}>{t.morale.toFixed(0)}% · {ml.text}</span></div>
           <div>Active starters: <span className={starterCount === slots.length ? "font-semibold text-success" : "font-semibold text-destructive"}>{starterCount}/{slots.length}</span></div>
+          <div>Payroll: <span className={`font-semibold ${payroll > (state.salaryCap ?? Infinity) + 0.001 ? "text-destructive" : "text-foreground"}`}>${payroll.toFixed(1)}M / ${(state.salaryCap ?? 0).toFixed(1)}M cap</span></div>
+          <div className="text-[10px]">{contractEditable ? "Contracts: manual (editable)" : "Contracts: AI-managed (locked)"}</div>
         </div>
       </div>
 
