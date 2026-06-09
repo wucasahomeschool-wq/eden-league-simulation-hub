@@ -136,41 +136,40 @@ export function TeamEditorSuite() {
       </div>
 
       {/* Formation pitch */}
-      <div className="mb-6 rounded-xl border bg-panel/40 p-4">
+      <div className="mb-6 rounded-xl border border-border bg-card/60 p-4 shadow-lg">
         <div className="mb-3 flex flex-wrap items-end gap-3">
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Formation (DEF-MID-ATT, must total 8 outfielders)
+              Formation (any rows; digits must total 8 outfielders)
             </label>
             <div className="flex gap-2">
               <Input
                 value={formationDraft}
                 onChange={(e) => setFormationDraft(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && setFormation(team, formationDraft)}
+                onKeyDown={(e) => e.key === "Enter" && isValidFormation(formationDraft) && setFormation(team, formationDraft)}
                 placeholder="3-3-2"
-                className="h-9 w-28 bg-card font-mono"
+                className="h-9 w-32 bg-card font-mono"
               />
-              <Button size="sm" variant="secondary" onClick={() => setFormation(team, formationDraft)}>
+              <Button size="sm" variant="secondary" disabled={!isValidFormation(formationDraft)} onClick={() => setFormation(team, formationDraft)}>
                 APPLY
               </Button>
               <Button size="sm" variant="outline" onClick={() => autoFillLineup(team)}>
                 AUTO-FILL
               </Button>
             </div>
+            {!isValidFormation(formationDraft) && (
+              <p className="mt-1 text-xs text-destructive">Digits must sum to 8 (e.g. 3-3-2, 4-4, 2-3-2-1, 1-2-3-2).</p>
+            )}
           </div>
           <p className="text-xs text-muted-foreground">
-            A simulation requires a valid 9-man distribution: 1 GK, 3 DF, 3 MF, 2 ST. Each slot only
-            accepts a player from the matching position group.
+            Any player can be slotted into any position. A simulation requires all 9 slots filled with
+            healthy players.
           </p>
         </div>
 
-        <div className="rounded-lg bg-[oklch(0.93_0.04_150)] p-4">
-          <PitchRow slots={slots} group="ST" team={team} t={t} setLineupSlot={setLineupSlot} />
-          <PitchRow slots={slots} group="MF" team={team} t={t} setLineupSlot={setLineupSlot} />
-          <PitchRow slots={slots} group="DF" team={team} t={t} setLineupSlot={setLineupSlot} />
-          <PitchRow slots={slots} group="GK" team={team} t={t} setLineupSlot={setLineupSlot} />
-        </div>
+        <PitchField slots={slots} team={team} t={t} setLineupSlot={setLineupSlot} />
       </div>
+
 
       <div className="overflow-x-auto rounded-xl border bg-card">
         <table className="w-full border-collapse text-xs">
