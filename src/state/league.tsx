@@ -731,17 +731,18 @@ interface LeagueContextValue {
 const LeagueContext = createContext<LeagueContextValue | null>(null);
 
 // Auto-promote acquired players into the lineup if they outrate the current
-// starter in their position group (feature: new acquisitions take a spot).
+// weakest starter. Goalkeepers target the GK slot; outfielders target any
+// outfield slot (any player can play any outfield position).
 function autoPromote(team: LeagueTeam, incoming: LeaguePlayer[]): LeagueTeam {
   const slots = buildLineupSlots(team.formation);
   const lineup = [...team.lineup];
   for (const inc of incoming) {
-    const g = positionGroup(inc.position);
     if (lineup.includes(inc.name)) continue; // already starting
+    const targetGroup: LineupSlot["group"] = positionGroup(inc.position) === "GK" ? "GK" : "OUT";
     let worstIdx = -1;
     let worstRating = Infinity;
     slots.forEach((s, i) => {
-      if (s.group !== g) return;
+      if (s.group !== targetGroup) return;
       const cur = team.players.find((p) => p.name === lineup[i]);
       const r = cur ? cur.rating : -1;
       if (r < worstRating) { worstRating = r; worstIdx = i; }
