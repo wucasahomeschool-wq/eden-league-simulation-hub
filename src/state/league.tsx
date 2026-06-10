@@ -842,15 +842,101 @@ function offseasonTeam(team: LeagueTeam): LeagueTeam {
   return syncStarters({ ...team, players, morale, lineup });
 }
 
+const CLOUD_ROW_ID = "main";
+
 export function LeagueProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<LeagueState>(() => loadState());
 
+  // Cloud sync bookkeeping.
+  const versionRef = useRef<number>(0); // last version we know about from Cloud
+  const selfVersionRef = useRef<number>(-1); // version of our own most recent write (ignore its echo)
+  const hydratedRef = useRef(false); // becomes true after the first Cloud reconcile
+  const applyingRemoteRef = useRef(false); // skip persisting a state that just arrived from Cloud
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRef = useRef<LeagueState | null>(null);
+
+  // Persist the live league document to Cloud (undo history is kept local only).
+  function pushToCloud(snapshot: LeagueState) {
+    const nextVersion = versionRef.current + 1;
+    const { undoStack: _ignore, ...rest } = snapshot;
+    const data = { ...rest, undoStack: [] };
+    versionRef.current = nextVersion;
+    selfVersionRef.current = nextVersion;
+    void supabase
+      .from("league_state")
+      .upsert({ id: CLOUD_ROW_ID, data, version: nextVersion, updated_at: new Date().toISOString() })
+      .then(({ error }) => {
+        if (error) console.warn("[league] cloud save failed", error.message);
+      });
+  }
+
+  // Initial hydration: load the shared league from Cloud, or seed it from local state.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("league_state")
+        .select("data, version")
+        .eq("id", CLOUD_ROW_ID)
+        .maybeSingle();
+      if (cancelled) return;
+      if (!error && data) {
+        versionRef.current = data.version ?? 1;
+        applyingRemoteRef.current = true;
+        setState((prev) => normalize({ ...(data.data as LeagueState), undoStack: prev.undoStack }));
+      } else {
+        // No shared league yet — seed it from whatever this browser currently has.
+        setState((prev) => {
+          pushToCloud(prev);
+          return prev;
+        });
+      }
+      hydratedRef.current = true;
+    })();
+
+    // Live multi-window sync.
+    const channel = supabase
+      .channel("league_state_sync")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "league_state", filter: `id=eq.${CLOUD_ROW_ID}` },
+        (payload) => {
+          const row = payload.new as { data?: LeagueState; version?: number } | null;
+          if (!row || row.version == null || row.data == null) return;
+          if (row.version === selfVersionRef.current) return; // our own write echoing back
+          if (row.version <= versionRef.current) return; // stale
+          versionRef.current = row.version;
+          applyingRemoteRef.current = true;
+          setState((prev) => normalize({ ...(row.data as LeagueState), undoStack: prev.undoStack }));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist every change: local cache (instant fallback) + debounced Cloud write.
   useEffect(() => {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
       /* storage full / unavailable */
     }
+    if (!hydratedRef.current) return; // don't write back during initial hydration
+    if (applyingRemoteRef.current) {
+      applyingRemoteRef.current = false; // this state came from Cloud; don't echo it
+      return;
+    }
+    pendingRef.current = state;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      if (pendingRef.current) pushToCloud(pendingRef.current);
+    }, 500);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
   const standings = useMemo(() => computeStandings(state), [state]);
