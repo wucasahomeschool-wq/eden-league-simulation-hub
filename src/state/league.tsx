@@ -864,7 +864,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     selfVersionRef.current = nextVersion;
     void supabase
       .from("league_state")
-      .upsert({ id: CLOUD_ROW_ID, data, version: nextVersion, updated_at: new Date().toISOString() })
+      .upsert({ id: CLOUD_ROW_ID, data: data as unknown as Record<string, unknown>, version: nextVersion, updated_at: new Date().toISOString() } as never)
       .then(({ error }) => {
         if (error) console.warn("[league] cloud save failed", error.message);
       });
