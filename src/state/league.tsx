@@ -883,7 +883,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       if (!error && data) {
         versionRef.current = data.version ?? 1;
         applyingRemoteRef.current = true;
-        setState((prev) => normalize({ ...(data.data as LeagueState), undoStack: prev.undoStack }));
+        setState((prev) => normalize({ ...(data.data as unknown as LeagueState), undoStack: prev.undoStack }));
       } else {
         // No shared league yet — seed it from whatever this browser currently has.
         setState((prev) => {
