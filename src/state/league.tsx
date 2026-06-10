@@ -235,7 +235,7 @@ export function rollInjuryWeeks(): number {
 }
 
 // ---------------- Initialization ----------------
-function initState(): LeagueState {
+export function initState(): LeagueState {
   const teams: Record<string, LeagueTeam> = {};
   const teamOrder: string[] = [];
   for (const t of RAW_TEAMS) {
