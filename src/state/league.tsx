@@ -1,5 +1,6 @@
-// League state: types, localStorage persistence, initialization, and actions.
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+// League state: types, Cloud + localStorage persistence, initialization, and actions.
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { RAW_TEAMS } from "@/data/rosters";
 import { INITIAL_BUDGETS } from "@/data/budgets";
 import { INITIAL_SCHEDULE, MANUAL_ONLY_TEAMS } from "@/data/schedule";
