@@ -1,1 +1,0 @@
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.league_state TO sandbox_exec;
