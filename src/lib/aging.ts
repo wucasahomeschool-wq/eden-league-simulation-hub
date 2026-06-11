@@ -43,6 +43,8 @@ export function youthProspect(position: string): LeaguePlayer {
     injuryWeeks: 0,
     suspensionWeeks: 0,
     yellowLog: [],
+    salary: 5.0,
+    contractYears: 2,
     rating: 5.0, FIN: 5.0, SHO: 5.0, PAS: 4.5, VIS: 4.5, DRI: 5.5,
     PAC: 6.5, STA: 6.5, DEF: 5.0, TAC: 5.0, POS_attr: 4.0, COM: 4.0,
     WR: 5.5, AGG: 5.0, STR: 5.0, AER: 5.0,
