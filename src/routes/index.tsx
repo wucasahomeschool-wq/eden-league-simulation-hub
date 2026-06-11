@@ -8,7 +8,6 @@ import { TeamEditorSuite } from "@/components/TeamEditorSuite";
 import { PlayoffsSuite } from "@/components/PlayoffsSuite";
 import { MatchSchedulingSuite } from "@/components/MatchSchedulingSuite";
 import { TradesSuite } from "@/components/TradesSuite";
-import { ContractsSuite } from "@/components/ContractsSuite";
 import { Button } from "@/components/ui/button";
 import edenLogo from "@/assets/eden-league-logo.png.asset.json";
 
@@ -35,7 +34,6 @@ const SUITES = [
   { name: "League Standings", render: () => <StandingsSuite /> },
   { name: "Playoffs", render: () => <PlayoffsSuite /> },
   { name: "Trades", render: () => <TradesSuite /> },
-  { name: "Contracts", render: () => <ContractsSuite /> },
   { name: "Team Editor", render: () => <TeamEditorSuite /> },
 ];
 
