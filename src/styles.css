@@ -1,6 +1,7 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+@import url("https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
 
 @custom-variant dark (&:is(.dark *));
 
@@ -44,43 +45,34 @@
 }
 
 :root {
-  --radius: 0.6rem;
-  /* Vibrant soccer-pitch green + chalk-white stadium palette */
-  --background: oklch(0.82 0.13 146);
-  --foreground: oklch(0.22 0.06 150);
-  --card: oklch(0.995 0.006 142);
-  --card-foreground: oklch(0.22 0.06 150);
-  --popover: oklch(0.995 0.006 142);
-  --popover-foreground: oklch(0.22 0.06 150);
-  /* Energetic grass green */
-  --primary: oklch(0.55 0.19 148);
-  --primary-foreground: oklch(0.99 0.01 142);
-  --primary-glow: oklch(0.72 0.2 150);
-  --secondary: oklch(0.9 0.07 146);
-  --secondary-foreground: oklch(0.28 0.08 150);
-  --muted: oklch(0.92 0.05 146);
-  --muted-foreground: oklch(0.42 0.05 150);
-  /* Stadium gold accent */
-  --accent: oklch(0.82 0.16 86);
-  --accent-foreground: oklch(0.28 0.1 90);
-  --destructive: oklch(0.55 0.2 27);
+  --radius: 0.5rem;
+  /* Pitch-inspired true greens (no teal) on white */
+  --background: oklch(0.965 0.04 142);
+  --foreground: oklch(0.25 0.05 142);
+  --card: oklch(0.995 0.008 142);
+  --card-foreground: oklch(0.25 0.05 142);
+  --popover: oklch(0.995 0.008 142);
+  --popover-foreground: oklch(0.25 0.05 142);
+  /* Lighter grass green for interactive elements */
+  --primary: oklch(0.62 0.15 142);
+  --primary-foreground: oklch(0.99 0.005 142);
+  --secondary: oklch(0.93 0.05 142);
+  --secondary-foreground: oklch(0.3 0.06 142);
+  --muted: oklch(0.94 0.04 142);
+  --muted-foreground: oklch(0.48 0.04 142);
+  --accent: oklch(0.9 0.08 142);
+  --accent-foreground: oklch(0.28 0.09 142);
+  --destructive: oklch(0.55 0.18 25);
   --destructive-foreground: oklch(0.99 0.002 250);
-  --success: oklch(0.58 0.18 146);
+  --success: oklch(0.6 0.16 142);
   --success-foreground: oklch(0.99 0.002 250);
-  --starter: oklch(0.86 0.14 138);
-  --border: oklch(0.78 0.06 146);
-  --input: oklch(0.8 0.05 146);
-  --ring: oklch(0.55 0.19 148);
-  --panel: oklch(0.9 0.07 146);
-  --console-bg: oklch(0.24 0.06 150);
-  --console-fg: oklch(0.9 0.14 145);
-  /* Stadium effects */
-  --gradient-pitch: linear-gradient(160deg, oklch(0.6 0.16 150) 0%, oklch(0.78 0.14 146) 55%, oklch(0.86 0.12 142) 100%);
-  --shadow-glow: 0 0 0 1px color-mix(in oklab, var(--primary) 25%, transparent), 0 12px 30px -12px color-mix(in oklab, var(--primary) 55%, transparent);
-}
-
-@theme inline {
-  --color-primary-glow: var(--primary-glow);
+  --starter: oklch(0.88 0.1 138);
+  --border: oklch(0.86 0.04 142);
+  --input: oklch(0.86 0.04 142);
+  --ring: oklch(0.62 0.15 142);
+  --panel: oklch(0.93 0.055 142);
+  --console-bg: oklch(0.92 0.05 142);
+  --console-fg: oklch(0.28 0.06 142);
 }
 
 @layer base {
@@ -89,14 +81,7 @@
   }
   body {
     background-color: var(--color-background);
-    background-image: var(--gradient-pitch),
-      repeating-linear-gradient(90deg, color-mix(in oklab, #ffffff 6%, transparent) 0 56px, transparent 56px 112px);
-    background-attachment: fixed;
     color: var(--color-foreground);
     font-family: var(--font-sans);
   }
-}
-
-@utility glow {
-  box-shadow: var(--shadow-glow);
 }

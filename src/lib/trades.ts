@@ -238,14 +238,6 @@ export function generateTradeProposals(state: LeagueState): TradeProposal[] {
           if (!tradeKeepsRosterLegal(teamA, pA, pB)) continue;
           if (!tradeKeepsRosterLegal(teamB, pB, pA)) continue;
 
-          // Cap Lock: salaries travel with players; block deals that push either
-          // club's payroll over the league Hard Salary Cap.
-          const cap = state.salaryCap ?? Infinity;
-          const payA = teamA.players.reduce((s, p) => s + (p.salary ?? 0), 0) - (pA.salary ?? 0) + (pB.salary ?? 0);
-          const payB = teamB.players.reduce((s, p) => s + (p.salary ?? 0), 0) - (pB.salary ?? 0) + (pA.salary ?? 0);
-          if (payA > cap + 0.001 || payB > cap + 0.001) continue;
-
-
           const deltaUA = tradeUtilityDelta(squadA, pA, pB, cashA - cashB);
           const deltaUB = tradeUtilityDelta(squadB, pB, pA, cashB - cashA);
 
