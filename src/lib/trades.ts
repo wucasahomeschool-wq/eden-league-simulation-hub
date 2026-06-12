@@ -241,9 +241,14 @@ export function generateTradeProposals(state: LeagueState): TradeProposal[] {
           // Cap Lock: salaries travel with players; block deals that push either
           // club's payroll over the league Hard Salary Cap.
           const cap = state.salaryCap ?? Infinity;
-          const payA = teamA.players.reduce((s, p) => s + (p.salary ?? 0), 0) - (pA.salary ?? 0) + (pB.salary ?? 0);
-          const payB = teamB.players.reduce((s, p) => s + (p.salary ?? 0), 0) - (pB.salary ?? 0) + (pA.salary ?? 0);
-          if (payA > cap + 0.001 || payB > cap + 0.001) continue;
+          const curA = teamA.players.reduce((s, p) => s + (p.salary ?? 0), 0);
+          const curB = teamB.players.reduce((s, p) => s + (p.salary ?? 0), 0);
+          const payA = curA - (pA.salary ?? 0) + (pB.salary ?? 0);
+          const payB = curB - (pB.salary ?? 0) + (pA.salary ?? 0);
+          // Block only deals that push a club OVER the cap. A club already above
+          // the cap may still trade as long as the deal doesn't raise its payroll.
+          if (payA > cap + 0.001 && payA > curA + 0.001) continue;
+          if (payB > cap + 0.001 && payB > curB + 0.001) continue;
 
 
           const deltaUA = tradeUtilityDelta(squadA, pA, pB, cashA - cashB);
