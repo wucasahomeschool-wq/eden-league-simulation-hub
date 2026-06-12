@@ -863,8 +863,8 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   // Persist the live league document to Cloud (undo history is kept local only).
   function pushToCloud(snapshot: LeagueState) {
     const nextVersion = versionRef.current + 1;
-    const { undoStack: _ignore, ...rest } = snapshot;
-    const data = { ...rest, undoStack: [] };
+    const { undoStack: _ignore, redoStack: _ignore2, ...rest } = snapshot;
+    const data = { ...rest, undoStack: [], redoStack: [] };
     versionRef.current = nextVersion;
     selfVersionRef.current = nextVersion;
     void supabase
