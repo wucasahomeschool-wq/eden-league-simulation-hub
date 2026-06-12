@@ -37,6 +37,7 @@ export interface EngineSettings {
 }
 
 export const DEFAULT_SETTINGS: EngineSettings = {
+  manualSimTeams: ["Socks", "Gugu Team", "Spams"],
   defaultTempo: 1.2,
   goalMultiplier: 0.6,
   identityBoostWeight: 0.6,
