@@ -1094,8 +1094,8 @@ export interface MatchResult {
 export function run_match(
   team_A: EngineTeam,
   team_B: EngineTeam,
-  match_tempo = 1.2,
-  GOAL_MULTIPLIER = GOAL_MULTIPLIER_DEFAULT,
+  match_tempo = settings.defaultTempo,
+  GOAL_MULTIPLIER = settings.goalMultiplier,
   playoff = false
 ): MatchResult {
   const log: Log = [];
