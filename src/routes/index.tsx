@@ -54,34 +54,35 @@ function Hub() {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 border-b bg-card/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3">
-          <UndoButton />
-          <button
-            onClick={prev}
-            aria-label="Previous suite"
-            className="ml-auto select-none px-3 py-1 text-2xl font-bold text-muted-foreground transition-colors hover:text-primary"
-          >
-            ‹
-          </button>
-          <div className="flex flex-col items-center text-center">
-            <div className="flex items-center gap-2">
-              <img src={edenLogo.url} alt="Eden League crest" className="h-8 w-8 object-contain" />
-              <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                Eden League Data Hub
+        <div className="mx-auto max-w-6xl px-4 py-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={prev}
+              aria-label="Previous suite"
+              className="ml-auto select-none px-3 py-1 text-2xl font-bold text-muted-foreground transition-colors hover:text-primary"
+            >
+              ‹
+            </button>
+            <div className="flex flex-col items-center text-center">
+              <div className="flex items-center gap-2">
+                <img src={edenLogo.url} alt="Eden League crest" className="h-8 w-8 object-contain" />
+                <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                  Eden League Data Hub
+                </div>
               </div>
+              <h1 className="text-lg font-extrabold tracking-tight sm:text-xl">
+                {SUITES[idx].name}
+              </h1>
             </div>
-            <h1 className="text-lg font-extrabold tracking-tight sm:text-xl">
-              {SUITES[idx].name}
-            </h1>
+            <button
+              onClick={next}
+              aria-label="Next suite"
+              className="mr-auto select-none px-3 py-1 text-2xl font-bold text-muted-foreground transition-colors hover:text-primary"
+            >
+              ›
+            </button>
           </div>
-          <button
-            onClick={next}
-            aria-label="Next suite"
-            className="mr-auto select-none px-3 py-1 text-2xl font-bold text-muted-foreground transition-colors hover:text-primary"
-          >
-            ›
-          </button>
-          <div className="w-[72px]" aria-hidden />
+          <Toolbar />
         </div>
       </header>
 
@@ -94,30 +95,29 @@ function Hub() {
   );
 }
 
-function UndoButton() {
-  const { undo, redo, canUndo, canRedo } = useLeague();
+function Toolbar() {
+  const { undo, redo, canUndo, canRedo, state, standings, leaderboards } = useLeague();
   return (
-    <div className="flex items-center gap-1.5">
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={undo}
-        disabled={!canUndo}
-        title="Undo the last action across any suite"
-        className="font-semibold"
-      >
+    <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
+      <Button size="sm" variant="outline" onClick={undo} disabled={!canUndo}
+        title="Undo the last action across any suite" className="font-semibold">
         ↶ UNDO
       </Button>
+      <Button size="sm" variant="outline" onClick={redo} disabled={!canRedo}
+        title="Redo the last undone action" className="font-semibold">
+        ↷ REDO
+      </Button>
+      <SaveVersionButton />
       <Button
         size="sm"
         variant="outline"
-        onClick={redo}
-        disabled={!canRedo}
-        title="Redo the last undone action"
+        onClick={() => downloadLeagueExport(state, standings, leaderboards)}
+        title="Download all league data as a JSON file"
         className="font-semibold"
       >
-        ↷ REDO
+        ⬇ EXPORT LEAGUE DATA
       </Button>
     </div>
   );
+}
 }
