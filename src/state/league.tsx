@@ -511,7 +511,7 @@ function advancePlayoffs(playoffs: PlayoffsState): PlayoffsState {
 }
 
 export function isManualOnly(home: string, away: string): boolean {
-  return MANUAL_ONLY_TEAMS.includes(home) || MANUAL_ONLY_TEAMS.includes(away);
+  return isManualSimTeam(home) || isManualSimTeam(away);
 }
 
 // Build the ordered roster for the engine: available starters first, then
