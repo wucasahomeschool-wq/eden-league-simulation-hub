@@ -360,10 +360,12 @@ function loadState(): LeagueState {
   if (typeof window === "undefined") return initState();
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw) return normalize(JSON.parse(raw) as LeagueState);
+    // Force the undo/redo history empty on load — it is session-only and must
+    // match the server-rendered (empty) state to avoid a hydration mismatch.
+    if (raw) return normalize({ ...(JSON.parse(raw) as LeagueState), undoStack: [], redoStack: [] });
     for (const key of LEGACY_STORAGE_KEYS) {
       const legacy = window.localStorage.getItem(key);
-      if (legacy) return normalize(JSON.parse(legacy) as LeagueState);
+      if (legacy) return normalize({ ...(JSON.parse(legacy) as LeagueState), undoStack: [], redoStack: [] });
     }
   } catch {
     /* ignore corrupt state */
@@ -950,7 +952,15 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   // Persist every change: local cache (instant fallback) + debounced Cloud write.
   useEffect(() => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      // Undo/redo history is session-only (in memory). Persisting it to
+      // localStorage makes the client hydrate with a different canUndo/canRedo
+      // than the server rendered, which React refuses to patch up — leaving the
+      // toolbar buttons stuck with a stale `disabled` attribute.
+      const { undoStack: _u, redoStack: _r, ...persistable } = state;
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...persistable, undoStack: [], redoStack: [] }),
+      );
     } catch {
       /* storage full / unavailable */
     }
