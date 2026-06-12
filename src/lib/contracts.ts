@@ -187,7 +187,7 @@ export function runContractCycle(state: LeagueState): {
 
   // 3. Emergency roster filling (non-exempt clubs), richest cap headroom first.
   const order = state.teamOrder
-    .filter((n) => !CONTRACT_EXEMPT_TEAMS.has(n))
+    .filter((n) => !isContractExempt(n))
     .sort((a, b) => (salaryCap - payrollOf(teams[a])) - (salaryCap - payrollOf(teams[b])))
     .reverse();
 
