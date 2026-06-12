@@ -104,8 +104,9 @@ export interface VersionData {
   playoffs: LeagueState["playoffs"];
   tradeProposals: LeagueState["tradeProposals"];
   freeAgents: LeagueState["freeAgents"];
-  salaryCap: number;
   contractsInitialized: boolean;
+  // NOTE: salaryCap is an app setting (Settings suite), NOT league data, so it
+  // is intentionally excluded from snapshots — reverting never changes it.
 }
 
 export function extractVersionData(state: LeagueState): VersionData {
@@ -118,7 +119,6 @@ export function extractVersionData(state: LeagueState): VersionData {
     playoffs: state.playoffs,
     tradeProposals: state.tradeProposals,
     freeAgents: state.freeAgents,
-    salaryCap: state.salaryCap,
     contractsInitialized: state.contractsInitialized,
   };
 }
