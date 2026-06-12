@@ -1378,6 +1378,20 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         }
         return { ...prev, salaryCap: next, teams };
       }),
+    setSettings: (patch) =>
+      update((prev) => {
+        const current = prev.settings ?? getSettings();
+        const merged: EngineSettings = {
+          ...DEFAULT_SETTINGS,
+          ...current,
+          ...patch,
+          contractExemptTeams: [
+            ...(patch.contractExemptTeams ?? current.contractExemptTeams ?? DEFAULT_SETTINGS.contractExemptTeams),
+          ],
+        };
+        applySettings(merged); // sync the live engine singleton immediately
+        return { ...prev, settings: merged };
+      }),
     revertToVersion: (data) =>
       update((prev) => normalize({
         ...prev,
