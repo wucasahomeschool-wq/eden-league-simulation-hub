@@ -950,7 +950,15 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   // Persist every change: local cache (instant fallback) + debounced Cloud write.
   useEffect(() => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      // Undo/redo history is session-only (in memory). Persisting it to
+      // localStorage makes the client hydrate with a different canUndo/canRedo
+      // than the server rendered, which React refuses to patch up — leaving the
+      // toolbar buttons stuck with a stale `disabled` attribute.
+      const { undoStack: _u, redoStack: _r, ...persistable } = state;
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...persistable, undoStack: [], redoStack: [] }),
+      );
     } catch {
       /* storage full / unavailable */
     }
