@@ -125,11 +125,11 @@ export function moraleScaledAttrs(
   for (const key of ATTRS) {
     out[key] = clampAttr((player[key] as number) * factor);
   }
-  const pm = playerMorale ?? MORALE_BASELINE;
-  if (pm >= HIGH_MORALE) {
+  const pm = playerMorale ?? settings.moraleBaseline;
+  if (pm >= settings.highMorale) {
     out.POS_attr = clampAttr(out.POS_attr * 1.05);
     out.COM = clampAttr(out.COM * 1.05);
-  } else if (pm <= LOW_MORALE) {
+  } else if (pm <= settings.lowMorale) {
     out.PAS = clampAttr(out.PAS * 0.95);
     out.TAC = clampAttr(out.TAC * 0.95);
   }
@@ -137,7 +137,7 @@ export function moraleScaledAttrs(
 }
 
 export function moraleLabel(morale: number): { text: string; tone: "high" | "mid" | "low" } {
-  if (morale >= HIGH_MORALE) return { text: "Buoyant", tone: "high" };
-  if (morale <= LOW_MORALE) return { text: "Fragile", tone: "low" };
+  if (morale >= settings.highMorale) return { text: "Buoyant", tone: "high" };
+  if (morale <= settings.lowMorale) return { text: "Fragile", tone: "low" };
   return { text: "Steady", tone: "mid" };
 }
