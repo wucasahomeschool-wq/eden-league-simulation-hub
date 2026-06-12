@@ -51,7 +51,7 @@ function LeagueSettings({
   }
 
   function resetAll() {
-    setSettings({ ...DEFAULT_SETTINGS, contractExemptTeams: [...DEFAULT_SETTINGS.contractExemptTeams] });
+    setSettings({ ...DEFAULT_SETTINGS, contractExemptTeams: [...DEFAULT_SETTINGS.contractExemptTeams], manualSimTeams: [...DEFAULT_SETTINGS.manualSimTeams] });
   }
 
   return (
