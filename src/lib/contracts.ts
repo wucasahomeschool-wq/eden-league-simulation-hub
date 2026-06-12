@@ -123,13 +123,14 @@ export function evaluateClubContracts(
         detail: `Cut low-impact player ($${player.salary ?? 0}M) to save cap space.`,
       });
     } else {
-      const paycut = round2(demand.salary * 0.85);
+      const paycut = round2(demand.salary * (1 - settings.veteranPaycut));
+      const cutPct = Math.round(settings.veteranPaycut * 100);
       const acceptanceChance = 30 + (player.morale ?? 50) * 0.5;
       if (randInt(1, 100) <= acceptanceChance) {
         roster[idx] = { ...player, salary: paycut, contractYears: demand.years };
         actions.push({
           type: "NEGOTIATED", team: team.name, player: player.name,
-          detail: `Accepted a 15% paycut ($${paycut}M for ${demand.years}yrs).`,
+          detail: `Accepted a ${cutPct}% paycut ($${paycut}M for ${demand.years}yrs).`,
         });
       } else {
         freed.push({ ...player, contractYears: 0 });
