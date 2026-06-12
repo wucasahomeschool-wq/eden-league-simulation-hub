@@ -94,7 +94,7 @@ export function applyPlayerEvent(
   event: PlayerEvent
 ): void {
   if (EXEMPT_TEAMS.has(team.name)) return;
-  player.morale = clampMorale((player.morale ?? MORALE_BASELINE) + PLAYER_EVENTS[event]);
+  player.morale = clampMorale((player.morale ?? settings.moraleBaseline) + PLAYER_EVENTS[event]);
 }
 
 // ---------------- Match simulation scaling ----------------
