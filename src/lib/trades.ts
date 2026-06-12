@@ -2,6 +2,7 @@
 // reference (player valuation, team utility, fair-deal pre-flight). Used to
 // auto-generate weekly trade proposals across the whole league market at once.
 import type { LeaguePlayer, LeagueState, LeagueTeam } from "@/state/league";
+import { settings } from "@/lib/engine-settings";
 
 // ---------------- Budget parsing / formatting ----------------
 // Budgets are stored as display strings like "$21M" / "$24.6M". The algorithm
