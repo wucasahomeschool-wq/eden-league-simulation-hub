@@ -106,6 +106,7 @@ export interface LeagueState {
   playoffs?: PlayoffsState;
   tradeProposals: TradeProposal[];
   undoStack: string[]; // serialized prior states (universal undo)
+  redoStack: string[]; // serialized undone states (universal redo)
   salaryCap: number; // league-wide hard salary cap ($M)
   freeAgents: LeaguePlayer[]; // unattached players available for free signing
   contractsInitialized: boolean; // first-boot compliance setup complete
@@ -282,7 +283,7 @@ export function initState(): LeagueState {
   const { teams: capTeams, salaryCap } = initializeContracts(teams, teamOrder);
   return {
     currentWeek: 1, season: 1, teamOrder, teams: capTeams, fixtures,
-    results: {}, payloads: {}, tradeProposals: [], undoStack: [],
+    results: {}, payloads: {}, tradeProposals: [], undoStack: [], redoStack: [],
     salaryCap, freeAgents: [], contractsInitialized: true,
   };
 }
@@ -339,6 +340,7 @@ function normalize(state: LeagueState): LeagueState {
     tradeProposals: state.tradeProposals ?? [],
     payloads: state.payloads ?? {},
     undoStack: state.undoStack ?? [],
+    redoStack: state.redoStack ?? [],
     teams: outTeams,
     salaryCap,
     freeAgents: state.freeAgents ?? [],
