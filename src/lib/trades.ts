@@ -130,13 +130,13 @@ function isSurplus(squad: Squad, g: PosKey): boolean {
 
 function squadUtility(squad: Squad): number {
   const activeRating = sum(squad.active.map((p) => p.rating));
-  const benchRating = sum(squad.bench.map((p) => p.rating)) * 0.4;
+  const benchRating = sum(squad.bench.map((p) => p.rating)) * settings.benchRatingWeight;
   const counts = countPositions([...squad.active, ...squad.bench]);
   let scarcity = 0;
   if (counts.GK < 1) scarcity += 15.0;
   if (counts.DEF < 3) scarcity += 10.0;
   if (counts.ATT < 2) scarcity += 8.0;
-  const cashUtility = squad.budgetM * 0.25;
+  const cashUtility = squad.budgetM * settings.cashUtilityWeight;
   return activeRating + benchRating - scarcity + cashUtility;
 }
 
