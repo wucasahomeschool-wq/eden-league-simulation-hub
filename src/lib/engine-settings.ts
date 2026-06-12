@@ -70,19 +70,31 @@ export const settings: EngineSettings = { ...DEFAULT_SETTINGS };
 // defaults). Called whenever league state is loaded/normalized or edited.
 export function applySettings(partial?: Partial<EngineSettings>): EngineSettings {
   Object.assign(settings, DEFAULT_SETTINGS, partial ?? {});
-  // Defensive: never allow a non-array exempt list to slip through.
+  // Defensive: never allow a non-array list to slip through.
   if (!Array.isArray(settings.contractExemptTeams)) {
     settings.contractExemptTeams = [...DEFAULT_SETTINGS.contractExemptTeams];
+  }
+  if (!Array.isArray(settings.manualSimTeams)) {
+    settings.manualSimTeams = [...DEFAULT_SETTINGS.manualSimTeams];
   }
   return settings;
 }
 
 // Read a fresh copy (e.g. to seed editable form state / persist into LeagueState).
 export function getSettings(): EngineSettings {
-  return { ...settings, contractExemptTeams: [...settings.contractExemptTeams] };
+  return {
+    ...settings,
+    contractExemptTeams: [...settings.contractExemptTeams],
+    manualSimTeams: [...settings.manualSimTeams],
+  };
 }
 
 // Live exempt-club check used across contract code & UI.
 export function isContractExempt(name: string): boolean {
   return settings.contractExemptTeams.includes(name);
+}
+
+// Live check: is this club's match entered manually (never simulated)?
+export function isManualSimTeam(name: string): boolean {
+  return settings.manualSimTeams.includes(name);
 }
