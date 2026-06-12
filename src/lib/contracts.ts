@@ -4,9 +4,10 @@
 // plus player/club contract negotiation sub-engines and an offseason free-agency
 // cycle.
 import type { LeaguePlayer, LeagueTeam, LeagueState } from "@/state/league";
+import { settings, isContractExempt } from "@/lib/engine-settings";
 
-// Per the spec, only Gugu Team and Spams are strictly exempt from the automated
-// contract sub-engines (admins handle their roster decisions manually).
+// Default reference list (the live, editable list lives in engine-settings).
+// Use isContractExempt(name) for runtime checks so Settings edits take effect.
 export const CONTRACT_EXEMPT_TEAMS = new Set(["Gugu Team", "Spams"]);
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
