@@ -277,7 +277,7 @@ export function generateTradeProposals(state: LeagueState): TradeProposal[] {
   // Surface every deal above the utility threshold, best first (capped).
   deals.sort((a, b) => b.deltaUA + b.deltaUB - (a.deltaUA + a.deltaUB));
   return deals
-    .filter((d) => d.deltaUA + d.deltaUB >= UTILITY_THRESHOLD)
+    .filter((d) => d.deltaUA + d.deltaUB >= settings.utilityThreshold)
     .slice(0, MAX_SURFACED);
 }
 
