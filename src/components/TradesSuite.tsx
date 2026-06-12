@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import {
   useLeague, TRANSFER_WINDOW_LAST_WEEK, type LeagueTeam,
 } from "@/state/league";
-import { calculatePlayerValue, type TradeProposal } from "@/lib/trades";
+import { calculatePlayerValue, tradeBlockReason, type TradeProposal } from "@/lib/trades";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,6 +15,29 @@ const NONE = "__none__";
 export function TradesSuite() {
   const { state, executeTrade, executeManualTrade, declineTrade, refreshTradeProposals } = useLeague();
   const inWindow = state.currentWeek <= TRANSFER_WINDOW_LAST_WEEK;
+
+  function acceptProposal(t: TradeProposal) {
+    const reason = tradeBlockReason(state, t.teamA, t.teamB, [t.aSends], [t.bSends], t.cashAReceives, t.cashBReceives);
+    if (reason) {
+      toast.error("Trade blocked", { description: reason });
+      return;
+    }
+    executeTrade(t);
+    toast.success("Trade completed", { description: `${t.teamA} ↔ ${t.teamB}` });
+  }
+
+  function submitManualTrade(
+    teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashA: number, cashB: number,
+  ): boolean {
+    const reason = tradeBlockReason(state, teamA, teamB, aPlayers, bPlayers, cashA, cashB);
+    if (reason) {
+      toast.error("Trade blocked", { description: reason });
+      return false;
+    }
+    executeManualTrade(teamA, teamB, aPlayers, bPlayers, cashA, cashB);
+    toast.success("Trade completed", { description: `${teamA} ↔ ${teamB}` });
+    return true;
+  }
 
   return (
     <div className="space-y-8">
@@ -44,7 +68,7 @@ export function TradesSuite() {
               <ProposalCard
                 key={t.id}
                 t={t}
-                onAccept={() => executeTrade(t)}
+                onAccept={() => acceptProposal(t)}
                 onDecline={() => declineTrade(t.id)}
               />
             ))}
@@ -55,7 +79,7 @@ export function TradesSuite() {
       {/* MANUAL SECTION */}
       <section>
         <h2 className="mb-3 text-base font-extrabold uppercase tracking-wide">Manual Trade Builder</h2>
-        <ManualTrade teams={state.teamOrder.map((n) => state.teams[n])} onSubmit={executeManualTrade} />
+        <ManualTrade teams={state.teamOrder.map((n) => state.teams[n])} onSubmit={submitManualTrade} />
       </section>
     </div>
   );
@@ -98,7 +122,7 @@ function ManualTrade({
   teams, onSubmit,
 }: {
   teams: LeagueTeam[];
-  onSubmit: (teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashA: number, cashB: number) => void;
+  onSubmit: (teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashA: number, cashB: number) => boolean;
 }) {
   const [teamAName, setTeamAName] = useState(teams[0].name);
   const [teamBName, setTeamBName] = useState(teams[1].name);
@@ -123,11 +147,12 @@ function ManualTrade({
 
   function submit() {
     if (sameTeam || nothing) return;
-    onSubmit(
+    const ok = onSubmit(
       teamAName, teamBName, validA, validB,
       Math.max(0, parseFloat(cashAReceives) || 0),
       Math.max(0, parseFloat(cashBReceives) || 0),
     );
+    if (!ok) return; // keep the form intact so the deal can be adjusted
     setAPlayers([]); setBPlayers([]); setCashAReceives("0"); setCashBReceives("0");
   }
 

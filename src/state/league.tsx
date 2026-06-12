@@ -786,6 +786,11 @@ function moveTrade(
   const aBudgetBefore = parseBudget(teamA.budget);
   const bBudgetBefore = parseBudget(teamB.budget);
 
+  // Affordability: a club can never spend cash it doesn't have — block any
+  // deal that would drive either transfer budget below zero.
+  if (aBudgetBefore + cashAReceives - cashBReceives < -0.001) return prev;
+  if (bBudgetBefore + cashBReceives - cashAReceives < -0.001) return prev;
+
   let aTeam: LeagueTeam = {
     ...teamA,
     budget: formatBudget(aBudgetBefore + cashAReceives - cashBReceives),
