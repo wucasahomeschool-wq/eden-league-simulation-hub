@@ -1009,7 +1009,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       teams[name] = { ...t, players };
     }
     let advanced: LeagueState = { ...next, teams };
-    if (advanced.currentWeek <= TRANSFER_WINDOW_LAST_WEEK) {
+    if (advanced.currentWeek <= engineSettings.transferWindowLastWeek) {
       advanced = { ...advanced, tradeProposals: generateTradeProposals(advanced) };
     }
     return advanced;
