@@ -1092,6 +1092,11 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         ...prev,
         teams: { ...prev.teams, [team]: { ...prev.teams[team], budget } },
       })),
+    setTacticalStyle: (team, style) =>
+      update((prev) => ({
+        ...prev,
+        teams: { ...prev.teams, [team]: { ...prev.teams[team], tactical_style: style } },
+      })),
     updatePlayer: (team, index, patch) =>
       update((prev) => {
         const oldName = prev.teams[team].players[index]?.name;
