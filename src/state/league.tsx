@@ -700,7 +700,10 @@ interface LeagueContextValue {
     payload?: MatchPayload
   ) => void;
   undo: () => void;
+  redo: () => void;
   canUndo: boolean;
+  canRedo: boolean;
+  setSalaryCap: (cap: number) => void;
   updateBudget: (team: string, budget: string) => void;
   updatePlayer: (team: string, index: number, patch: Partial<LeaguePlayer>) => void;
   setLineupSlot: (team: string, slot: number, playerName: string) => void;
