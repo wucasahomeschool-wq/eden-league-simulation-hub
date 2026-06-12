@@ -107,8 +107,8 @@ const ATTRS: (keyof LeaguePlayer)[] = [
 ];
 
 export function teamMoraleFactor(teamMorale: number): number {
-  if (teamMorale >= HIGH_MORALE) return 1.03;
-  if (teamMorale <= LOW_MORALE) return 0.97;
+  if (teamMorale >= settings.highMorale) return 1.03;
+  if (teamMorale <= settings.lowMorale) return 0.97;
   return 1.0;
 }
 
