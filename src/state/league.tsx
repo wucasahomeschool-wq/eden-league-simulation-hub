@@ -888,7 +888,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       if (!error && data) {
         versionRef.current = data.version ?? 1;
         applyingRemoteRef.current = true;
-        setState((prev) => normalize({ ...(data.data as unknown as LeagueState), undoStack: prev.undoStack }));
+        setState((prev) => normalize({ ...(data.data as unknown as LeagueState), undoStack: prev.undoStack, redoStack: prev.redoStack }));
       } else {
         // No shared league yet — seed it from whatever this browser currently has.
         setState((prev) => {
@@ -912,7 +912,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
           if (row.version <= versionRef.current) return; // stale
           versionRef.current = row.version;
           applyingRemoteRef.current = true;
-          setState((prev) => normalize({ ...(row.data as LeagueState), undoStack: prev.undoStack }));
+          setState((prev) => normalize({ ...(row.data as LeagueState), undoStack: prev.undoStack, redoStack: prev.redoStack }));
         }
       )
       .subscribe();
