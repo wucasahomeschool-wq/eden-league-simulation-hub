@@ -39,6 +39,28 @@ export function ContractsSuite() {
     setRan(true);
   }
 
+  const capEditor = (
+    <div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Hard Salary Cap</div>
+      <div className="mt-1 flex items-center gap-2">
+        <span className="font-mono text-2xl font-extrabold text-primary">${cap.toFixed(1)}M</span>
+        <Input
+          type="number"
+          min={1}
+          step={1}
+          value={capDraft}
+          placeholder="edit"
+          onChange={(e) => setCapDraft(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && commitCap()}
+          className="h-8 w-24 text-center font-mono"
+        />
+        <Button size="sm" variant="secondary" onClick={commitCap} disabled={!capDraft}>
+          SET CAP
+        </Button>
+      </div>
+    </div>
+  );
+
   if (!seasonOver) {
     return (
       <div className="rounded-xl border border-border bg-card/70 p-8 text-center shadow-lg">
@@ -47,6 +69,7 @@ export function ContractsSuite() {
           The Contracts suite opens once the season has ended (a playoff champion is crowned). Finish the
           playoffs to run the offseason contract cycle, free agency and salary-cap compliance.
         </p>
+        <div className="mt-6 flex justify-center">{capEditor}</div>
       </div>
     );
   }
@@ -54,10 +77,7 @@ export function ContractsSuite() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-card/70 p-4 shadow-lg">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Hard Salary Cap</div>
-          <div className="font-mono text-2xl font-extrabold text-primary">${cap.toFixed(1)}M</div>
-        </div>
+        {capEditor}
         <p className="max-w-xl text-xs text-muted-foreground">
           Run the offseason cycle to decay all contracts by one year, let the AI front offices of the 22
           non-exempt clubs re-sign, negotiate or release expiring players, and emergency-fill any roster
