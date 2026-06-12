@@ -72,19 +72,19 @@ export function clampMorale(v: number): number {
 
 // Apply a team macro event in place; returns whether a sacking was triggered.
 export function applyTeamEvent(team: LeagueTeam, event: TeamEvent): boolean {
-  team.morale = clampMorale((team.morale ?? MORALE_BASELINE) + TEAM_EVENTS[event]);
-  if (team.morale < SACK_THRESHOLD) {
+  team.morale = clampMorale((team.morale ?? settings.moraleBaseline) + TEAM_EVENTS[event]);
+  if (team.morale < settings.sackThreshold) {
     triggerManagerSack(team);
     return true;
   }
   return false;
 }
 
-// Fire the manager: random new tactical mentality + morale reset to 60%.
+// Fire the manager: random new tactical mentality + morale reset.
 export function triggerManagerSack(team: LeagueTeam): void {
   const options = TACTICS.filter((t) => t !== team.tactical_style);
   team.tactical_style = options[Math.floor(Math.random() * options.length)];
-  team.morale = MANAGER_RENEWAL_MORALE;
+  team.morale = settings.managerRenewalMorale;
 }
 
 // Apply a player micro event in place. Exempt clubs ignore player events.
