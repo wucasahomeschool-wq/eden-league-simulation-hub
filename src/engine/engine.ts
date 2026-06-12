@@ -213,7 +213,7 @@ function calculate_style_suitability_scores(
     1.0 * mean([us["STA"], us["WR"], us["AGG"]]) + 0.2 * (5.0 - mean([them["PAS"], them["COM"]]));
   scores["Balanced"] = 5.0;
 
-  if (team.favored_style in scores) scores[team.favored_style] += IDENTITY_BOOST_WEIGHT;
+  if (team.favored_style in scores) scores[team.favored_style] += settings.identityBoostWeight;
 
   return scores;
 }
