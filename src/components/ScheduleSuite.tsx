@@ -3,6 +3,7 @@ import {
   useLeague, isManualOnly, isWeekComplete, type FixtureEntry,
 } from "@/state/league";
 import { SimulationTerminal } from "@/components/SimulationTerminal";
+import { MatchCommentaryDialog } from "@/components/MatchCommentaryDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
@@ -13,6 +14,7 @@ export function ScheduleSuite() {
   const { state, setResult } = useLeague();
   const [simFixture, setSimFixture] = useState<FixtureEntry | null>(null);
   const [manualFixture, setManualFixture] = useState<FixtureEntry | null>(null);
+  const [commentaryFixture, setCommentaryFixture] = useState<FixtureEntry | null>(null);
 
   const weeks = useMemo(() => {
     const map = new Map<number, FixtureEntry[]>();
