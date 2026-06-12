@@ -1303,8 +1303,8 @@ export function run_match(
     }
   }
 
-  // === PENALTY SHOOTOUT TRIGGER (playoff matches only) ===
-  if (playoff && team_A.goals_scored === team_B.goals_scored) {
+  // === PENALTY SHOOTOUT TRIGGER (playoff matches only, when enabled) ===
+  if (playoff && settings.playoffPenalties && team_A.goals_scored === team_B.goals_scored) {
     run_penalty_shootout(team_A, team_B, log);
   }
 
