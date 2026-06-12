@@ -827,10 +827,14 @@ function moveTrade(
   aTeam = syncStarters(aTeam);
   bTeam = syncStarters(bTeam);
 
-  // The Cap Lock: salaries travel with players (contract preservation). Block any
-  // trade that pushes either club's payroll over the league Hard Salary Cap.
+  // The Cap Lock: salaries travel with players (contract preservation). Block a
+  // trade only if it would push a club OVER the Hard Salary Cap. Clubs already
+  // above the cap may still trade as long as the deal does not increase their
+  // payroll (so they can rebalance / shed salary without being frozen out).
   const cap = prev.salaryCap ?? Infinity;
-  if (payrollOf(aTeam) > cap + 0.001 || payrollOf(bTeam) > cap + 0.001) return prev;
+  const aOver = payrollOf(aTeam) > cap + 0.001 && payrollOf(aTeam) > payrollOf(teamA) + 0.001;
+  const bOver = payrollOf(bTeam) > cap + 0.001 && payrollOf(bTeam) > payrollOf(teamB) + 0.001;
+  if (aOver || bOver) return prev;
 
   return { ...prev, teams: { ...prev.teams, [aName]: aTeam, [bName]: bTeam } };
 }
