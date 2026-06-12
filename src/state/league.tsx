@@ -1377,7 +1377,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         playoffs: data.playoffs,
         tradeProposals: data.tradeProposals ?? [],
         freeAgents: data.freeAgents ?? prev.freeAgents,
-        salaryCap: data.salaryCap ?? prev.salaryCap,
+        // salaryCap intentionally NOT reverted — it is an app setting, not league data.
         contractsInitialized: data.contractsInitialized ?? prev.contractsInitialized,
       })),
     resetLeague: () => setState(initState()),
