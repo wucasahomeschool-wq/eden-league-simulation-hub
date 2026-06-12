@@ -1240,10 +1240,13 @@ export function run_match(
       evaluate_substitutions(team_A, TUP, diff_A, log);
       evaluate_substitutions(team_B, TUP, -diff_A, log);
 
-      if (evaluate_live_tactics(team_A, team_B, TUP, diff_A, last_change_A, log) !== team_A.tactical_style)
-        last_change_A = TUP;
-      if (evaluate_live_tactics(team_B, team_A, TUP, -diff_A, last_change_B, log) !== team_B.tactical_style)
-        last_change_B = TUP;
+      // Live in-match tactical shifts are gated by the Dynamic Tactics setting.
+      if (settings.dynamicTactics) {
+        if (evaluate_live_tactics(team_A, team_B, TUP, diff_A, last_change_A, log) !== team_A.tactical_style)
+          last_change_A = TUP;
+        if (evaluate_live_tactics(team_B, team_A, TUP, -diff_A, last_change_B, log) !== team_B.tactical_style)
+          last_change_B = TUP;
+      }
 
       last_fatigue_update += 5.0;
     }
