@@ -104,10 +104,20 @@ export function ScheduleSuite() {
                         </div>
                       )}
                       {r && (
-                        <div className="col-span-3 mt-0.5 flex items-center justify-center gap-3">
+                        <div className="col-span-3 mt-0.5 flex flex-wrap items-center justify-center gap-3">
                           <span className="text-[10px] uppercase text-muted-foreground">
                             {r.method === "SIM" ? "Simulated" : "Manual entry"}
                           </span>
+                          {r.method === "SIM" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-2 text-[11px] font-semibold text-primary"
+                              onClick={() => setCommentaryFixture(fx)}
+                            >
+                              VIEW MATCH COMMENTARY
+                            </Button>
+                          )}
                         </div>
                       )}
                     </li>
