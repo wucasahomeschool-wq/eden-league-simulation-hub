@@ -39,8 +39,8 @@ export function SimulationTerminal({
 
   const [home, setHome] = useState(initialHome ?? teams[0]);
   const [away, setAway] = useState(initialAway ?? teams[1]);
-  const [tempoIdx, setTempoIdx] = useState(defaultTempoIndex);
-  const [goalMult, setGoalMult] = useState(0.5);
+  const [tempoIdx, setTempoIdx] = useState(defaultTempoIndex ?? defaultTempoIdx());
+  const [goalMult, setGoalMult] = useState(settings.goalMultiplier);
 
   const [running, setRunning] = useState(false);
   const [lines, setLines] = useState<string[]>([]);
