@@ -536,13 +536,14 @@ export function simulateMatch(
   home: string,
   away: string,
   tempo: number,
-  goalMultiplier: number
+  goalMultiplier: number,
+  playoff = false
 ): SimOutput {
   const ht = state.teams[home];
   const at = state.teams[away];
   const engineHome = buildEngineTeam(ht.name, ht.tactical_style, rosterForEngine(ht));
   const engineAway = buildEngineTeam(at.name, at.tactical_style, rosterForEngine(at));
-  const result = run_match(engineHome, engineAway, tempo, goalMultiplier);
+  const result = run_match(engineHome, engineAway, tempo, goalMultiplier, playoff);
 
   const payload = buildMatchPayload(
     engineHome, engineAway, home, away, result.homeGoals, result.awayGoals
