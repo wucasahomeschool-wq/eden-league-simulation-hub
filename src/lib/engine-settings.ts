@@ -7,6 +7,7 @@
 
 export interface EngineSettings {
   // ---- Simulation engine ----
+  manualSimTeams: string[];      // clubs whose matches are entered manually (never simulated)
   defaultTempo: number;          // 1.0 slow / 1.2 normal / 1.4 fast
   goalMultiplier: number;        // global scoring multiplier
   identityBoostWeight: number;   // bonus for a club's favoured tactical style
