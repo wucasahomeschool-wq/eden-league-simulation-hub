@@ -70,7 +70,7 @@ export function calculatePlayerDemands(p: LeaguePlayer): ContractDemand {
   const marketValue = calculateMarketValue(p.rating);
   const moraleFactor = ((p.morale ?? 50) - 50.0) / 100.0; // -0.5 .. +0.5
   let demandModifier = 1.0 + moraleFactor * -0.15 + (p.rating / 10.0) * 0.1;
-  demandModifier = Math.max(0.8, Math.min(demandModifier, 1.4));
+  demandModifier = Math.max(settings.demandModifierMin, Math.min(demandModifier, settings.demandModifierMax));
   const salary = round2(marketValue * demandModifier);
   const years = (p.age ?? 25) >= 31 ? choice([1, 2]) : choice([2, 3, 4]);
   return { salary, years };
