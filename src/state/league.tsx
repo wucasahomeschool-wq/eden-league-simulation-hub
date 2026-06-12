@@ -8,6 +8,7 @@ import { buildEngineTeam, run_match } from "@/engine/engine";
 import { computeOverall } from "@/lib/ratings";
 import { computeStartingAge, ageOnePlayer } from "@/lib/aging";
 import { buildMatchPayload, type MatchPayload } from "@/lib/match-payload";
+import type { VersionData } from "@/lib/league-export";
 import {
   applyTeamEvent, applyPlayerEvent, moraleScaledAttrs, MORALE_BASELINE,
   EXEMPT_TEAMS, clampMorale, carryOverMorale,
@@ -704,6 +705,7 @@ interface LeagueContextValue {
   canUndo: boolean;
   canRedo: boolean;
   setSalaryCap: (cap: number) => void;
+  revertToVersion: (data: VersionData) => void;
   updateBudget: (team: string, budget: string) => void;
   updatePlayer: (team: string, index: number, patch: Partial<LeaguePlayer>) => void;
   setLineupSlot: (team: string, slot: number, playerName: string) => void;
