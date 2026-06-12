@@ -112,6 +112,7 @@ export interface LeagueState {
   salaryCap: number; // league-wide hard salary cap ($M)
   freeAgents: LeaguePlayer[]; // unattached players available for free signing
   contractsInitialized: boolean; // first-boot compliance setup complete
+  settings?: EngineSettings; // editable engine tuning knobs (Settings suite)
 }
 
 export interface StandingRow {
