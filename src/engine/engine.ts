@@ -9,6 +9,8 @@
 // by the UI bridge. DO NOT alter any formula.
 // =============================================================================
 
+import { settings } from "@/lib/engine-settings";
+
 export const GOAL_MULTIPLIER_DEFAULT = 0.6;
 export const IDENTITY_BOOST_WEIGHT = 0.6;
 
@@ -154,6 +156,11 @@ interface MatchEnvironment {
 }
 
 function makeEnvironment(): MatchEnvironment {
+  // Weather effects can be toggled off in Settings: every match then plays in
+  // neutral Clear/Sunny conditions (no pass/fatigue/injury modifiers).
+  if (!settings.weatherEffects) {
+    return { weather_name: "Clear/Sunny", pass_mod: 1.0, fatigue_mod: 1.0, injury_mod: 1.0, ref_strictness: randint(1, 10) };
+  }
   const conditions: [string, number, number, number][] = [
     ["Clear/Sunny", 1.0, 1.0, 1.0],
     ["Heavy Rain", 0.9, 1.15, 1.15],
@@ -206,7 +213,7 @@ function calculate_style_suitability_scores(
     1.0 * mean([us["STA"], us["WR"], us["AGG"]]) + 0.2 * (5.0 - mean([them["PAS"], them["COM"]]));
   scores["Balanced"] = 5.0;
 
-  if (team.favored_style in scores) scores[team.favored_style] += IDENTITY_BOOST_WEIGHT;
+  if (team.favored_style in scores) scores[team.favored_style] += settings.identityBoostWeight;
 
   return scores;
 }
@@ -1087,8 +1094,8 @@ export interface MatchResult {
 export function run_match(
   team_A: EngineTeam,
   team_B: EngineTeam,
-  match_tempo = 1.2,
-  GOAL_MULTIPLIER = GOAL_MULTIPLIER_DEFAULT,
+  match_tempo = settings.defaultTempo,
+  GOAL_MULTIPLIER = settings.goalMultiplier,
   playoff = false
 ): MatchResult {
   const log: Log = [];
@@ -1233,10 +1240,13 @@ export function run_match(
       evaluate_substitutions(team_A, TUP, diff_A, log);
       evaluate_substitutions(team_B, TUP, -diff_A, log);
 
-      if (evaluate_live_tactics(team_A, team_B, TUP, diff_A, last_change_A, log) !== team_A.tactical_style)
-        last_change_A = TUP;
-      if (evaluate_live_tactics(team_B, team_A, TUP, -diff_A, last_change_B, log) !== team_B.tactical_style)
-        last_change_B = TUP;
+      // Live in-match tactical shifts are gated by the Dynamic Tactics setting.
+      if (settings.dynamicTactics) {
+        if (evaluate_live_tactics(team_A, team_B, TUP, diff_A, last_change_A, log) !== team_A.tactical_style)
+          last_change_A = TUP;
+        if (evaluate_live_tactics(team_B, team_A, TUP, -diff_A, last_change_B, log) !== team_B.tactical_style)
+          last_change_B = TUP;
+      }
 
       last_fatigue_update += 5.0;
     }
@@ -1293,8 +1303,8 @@ export function run_match(
     }
   }
 
-  // === PENALTY SHOOTOUT TRIGGER (playoff matches only) ===
-  if (playoff && team_A.goals_scored === team_B.goals_scored) {
+  // === PENALTY SHOOTOUT TRIGGER (playoff matches only, when enabled) ===
+  if (playoff && settings.playoffPenalties && team_A.goals_scored === team_B.goals_scored) {
     run_penalty_shootout(team_A, team_B, log);
   }
 

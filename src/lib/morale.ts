@@ -3,11 +3,13 @@
 // Individual Player Morale (0–100, baseline 50), drives a dynamic event matrix,
 // scales match-simulation weights, and triggers AI managerial sackings.
 import type { LeaguePlayer, LeagueTeam } from "@/state/league";
+import { settings } from "@/lib/engine-settings";
 
 // Manual score-entry clubs bypass player-level micro events (their match
 // details are never simulated). Team-level macro events still apply to them.
 export const EXEMPT_TEAMS = new Set(["Gugu Team", "Spams", "Socks"]);
 
+// Default reference values (the live, editable values live in engine-settings).
 export const MORALE_BASELINE = 50;
 export const SACK_THRESHOLD = 25;
 export const MANAGER_RENEWAL_MORALE = 60;
@@ -15,13 +17,15 @@ export const HIGH_MORALE = 75;
 export const LOW_MORALE = 35;
 
 // Offseason morale regression: morale carries into the next season but is
-// nudged back toward the 50 baseline by up to 7 points. Anything within 7
-// points of 50 snaps exactly to 50.
+// nudged back toward the baseline by up to `seasonMoraleReset` points. Anything
+// within that many points of the baseline snaps exactly to the baseline.
 export const SEASON_MORALE_RESET = 7;
 export function carryOverMorale(morale: number): number {
-  const m = morale ?? MORALE_BASELINE;
-  if (Math.abs(m - MORALE_BASELINE) <= SEASON_MORALE_RESET) return MORALE_BASELINE;
-  return m > MORALE_BASELINE ? m - SEASON_MORALE_RESET : m + SEASON_MORALE_RESET;
+  const baseline = settings.moraleBaseline;
+  const reset = settings.seasonMoraleReset;
+  const m = morale ?? baseline;
+  if (Math.abs(m - baseline) <= reset) return baseline;
+  return m > baseline ? m - reset : m + reset;
 }
 
 // --- TEAM MORALE POINT MATRIX (engine reference values) ---
@@ -68,19 +72,19 @@ export function clampMorale(v: number): number {
 
 // Apply a team macro event in place; returns whether a sacking was triggered.
 export function applyTeamEvent(team: LeagueTeam, event: TeamEvent): boolean {
-  team.morale = clampMorale((team.morale ?? MORALE_BASELINE) + TEAM_EVENTS[event]);
-  if (team.morale < SACK_THRESHOLD) {
+  team.morale = clampMorale((team.morale ?? settings.moraleBaseline) + TEAM_EVENTS[event]);
+  if (team.morale < settings.sackThreshold) {
     triggerManagerSack(team);
     return true;
   }
   return false;
 }
 
-// Fire the manager: random new tactical mentality + morale reset to 60%.
+// Fire the manager: random new tactical mentality + morale reset.
 export function triggerManagerSack(team: LeagueTeam): void {
   const options = TACTICS.filter((t) => t !== team.tactical_style);
   team.tactical_style = options[Math.floor(Math.random() * options.length)];
-  team.morale = MANAGER_RENEWAL_MORALE;
+  team.morale = settings.managerRenewalMorale;
 }
 
 // Apply a player micro event in place. Exempt clubs ignore player events.
@@ -90,7 +94,7 @@ export function applyPlayerEvent(
   event: PlayerEvent
 ): void {
   if (EXEMPT_TEAMS.has(team.name)) return;
-  player.morale = clampMorale((player.morale ?? MORALE_BASELINE) + PLAYER_EVENTS[event]);
+  player.morale = clampMorale((player.morale ?? settings.moraleBaseline) + PLAYER_EVENTS[event]);
 }
 
 // ---------------- Match simulation scaling ----------------
@@ -103,8 +107,8 @@ const ATTRS: (keyof LeaguePlayer)[] = [
 ];
 
 export function teamMoraleFactor(teamMorale: number): number {
-  if (teamMorale >= HIGH_MORALE) return 1.03;
-  if (teamMorale <= LOW_MORALE) return 0.97;
+  if (teamMorale >= settings.highMorale) return 1.03;
+  if (teamMorale <= settings.lowMorale) return 0.97;
   return 1.0;
 }
 
@@ -121,11 +125,11 @@ export function moraleScaledAttrs(
   for (const key of ATTRS) {
     out[key] = clampAttr((player[key] as number) * factor);
   }
-  const pm = playerMorale ?? MORALE_BASELINE;
-  if (pm >= HIGH_MORALE) {
+  const pm = playerMorale ?? settings.moraleBaseline;
+  if (pm >= settings.highMorale) {
     out.POS_attr = clampAttr(out.POS_attr * 1.05);
     out.COM = clampAttr(out.COM * 1.05);
-  } else if (pm <= LOW_MORALE) {
+  } else if (pm <= settings.lowMorale) {
     out.PAS = clampAttr(out.PAS * 0.95);
     out.TAC = clampAttr(out.TAC * 0.95);
   }
@@ -133,7 +137,7 @@ export function moraleScaledAttrs(
 }
 
 export function moraleLabel(morale: number): { text: string; tone: "high" | "mid" | "low" } {
-  if (morale >= HIGH_MORALE) return { text: "Buoyant", tone: "high" };
-  if (morale <= LOW_MORALE) return { text: "Fragile", tone: "low" };
+  if (morale >= settings.highMorale) return { text: "Buoyant", tone: "high" };
+  if (morale <= settings.lowMorale) return { text: "Fragile", tone: "low" };
   return { text: "Steady", tone: "mid" };
 }

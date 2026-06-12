@@ -3,7 +3,7 @@ import {
   useLeague, ATTR_KEYS, isPlayerOut, SEASON_ENDING_WEEKS,
   buildLineupSlots, isValidFormation, type AttrKey, type LineupSlot,
 } from "@/state/league";
-import { CONTRACT_EXEMPT_TEAMS } from "@/lib/contracts";
+import { isContractExempt } from "@/lib/engine-settings";
 import { moraleLabel } from "@/lib/morale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,7 +58,7 @@ export function TeamEditorSuite() {
   const t = state.teams[team];
   if (!t) return null;
 
-  const contractEditable = CONTRACT_EXEMPT_TEAMS.has(team);
+  const contractEditable = isContractExempt(team);
   const payroll = t.players.reduce((s, p) => s + (p.salary ?? 0), 0);
   const slots = buildLineupSlots(t.formation);
   const starterCount = t.lineup.filter((n) => {

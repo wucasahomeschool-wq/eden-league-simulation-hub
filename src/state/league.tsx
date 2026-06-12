@@ -17,6 +17,7 @@ import {
   generateTradeProposals, parseBudget, formatBudget, type TradeProposal,
 } from "@/lib/trades";
 import { initializeContracts, calculateMarketValue, payrollOf, runContractCycle as runCycle, type ContractAction } from "@/lib/contracts";
+import { applySettings, getSettings, DEFAULT_SETTINGS, settings as engineSettings, type EngineSettings } from "@/lib/engine-settings";
 
 const STORAGE_KEY = "eden_league_state_v6";
 const LEGACY_STORAGE_KEYS = ["eden_league_state_v5", "eden_league_state_v4", "eden_league_state_v3", "eden_league_state_v2", "eden_league_state_v1"];
@@ -111,6 +112,7 @@ export interface LeagueState {
   salaryCap: number; // league-wide hard salary cap ($M)
   freeAgents: LeaguePlayer[]; // unattached players available for free signing
   contractsInitialized: boolean; // first-boot compliance setup complete
+  settings?: EngineSettings; // editable engine tuning knobs (Settings suite)
 }
 
 export interface StandingRow {
@@ -286,6 +288,7 @@ export function initState(): LeagueState {
     currentWeek: 1, season: 1, teamOrder, teams: capTeams, fixtures,
     results: {}, payloads: {}, tradeProposals: [], undoStack: [], redoStack: [],
     salaryCap, freeAgents: [], contractsInitialized: true,
+    settings: { ...DEFAULT_SETTINGS, contractExemptTeams: [...DEFAULT_SETTINGS.contractExemptTeams] },
   };
 }
 
@@ -335,6 +338,9 @@ function normalize(state: LeagueState): LeagueState {
     salaryCap = init.salaryCap;
     contractsInitialized = true;
   }
+  // Merge persisted tuning knobs into the live engine singleton so every
+  // engine immediately reads the current values (any load path hits normalize).
+  const mergedSettings = applySettings(state.settings);
   return {
     ...state,
     season: state.season ?? 1,
@@ -346,6 +352,7 @@ function normalize(state: LeagueState): LeagueState {
     salaryCap,
     freeAgents: state.freeAgents ?? [],
     contractsInitialized,
+    settings: { ...mergedSettings, contractExemptTeams: [...mergedSettings.contractExemptTeams] },
   };
 }
 
@@ -705,6 +712,7 @@ interface LeagueContextValue {
   canUndo: boolean;
   canRedo: boolean;
   setSalaryCap: (cap: number) => void;
+  setSettings: (patch: Partial<EngineSettings>) => void;
   revertToVersion: (data: VersionData) => void;
   updateBudget: (team: string, budget: string) => void;
   updatePlayer: (team: string, index: number, patch: Partial<LeaguePlayer>) => void;
@@ -1002,7 +1010,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       teams[name] = { ...t, players };
     }
     let advanced: LeagueState = { ...next, teams };
-    if (advanced.currentWeek <= TRANSFER_WINDOW_LAST_WEEK) {
+    if (advanced.currentWeek <= engineSettings.transferWindowLastWeek) {
       advanced = { ...advanced, tradeProposals: generateTradeProposals(advanced) };
     }
     return advanced;
@@ -1369,6 +1377,20 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
           teams[name] = { ...prev.teams[name], salaryBudget: next };
         }
         return { ...prev, salaryCap: next, teams };
+      }),
+    setSettings: (patch) =>
+      update((prev) => {
+        const current = prev.settings ?? getSettings();
+        const merged: EngineSettings = {
+          ...DEFAULT_SETTINGS,
+          ...current,
+          ...patch,
+          contractExemptTeams: [
+            ...(patch.contractExemptTeams ?? current.contractExemptTeams ?? DEFAULT_SETTINGS.contractExemptTeams),
+          ],
+        };
+        applySettings(merged); // sync the live engine singleton immediately
+        return { ...prev, settings: merged };
       }),
     revertToVersion: (data) =>
       update((prev) => normalize({

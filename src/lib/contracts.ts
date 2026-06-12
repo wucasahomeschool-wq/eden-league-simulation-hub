@@ -4,9 +4,10 @@
 // plus player/club contract negotiation sub-engines and an offseason free-agency
 // cycle.
 import type { LeaguePlayer, LeagueTeam, LeagueState } from "@/state/league";
+import { settings, isContractExempt } from "@/lib/engine-settings";
 
-// Per the spec, only Gugu Team and Spams are strictly exempt from the automated
-// contract sub-engines (admins handle their roster decisions manually).
+// Default reference list (the live, editable list lives in engine-settings).
+// Use isContractExempt(name) for runtime checks so Settings edits take effect.
 export const CONTRACT_EXEMPT_TEAMS = new Set(["Gugu Team", "Spams"]);
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -69,7 +70,7 @@ export function calculatePlayerDemands(p: LeaguePlayer): ContractDemand {
   const marketValue = calculateMarketValue(p.rating);
   const moraleFactor = ((p.morale ?? 50) - 50.0) / 100.0; // -0.5 .. +0.5
   let demandModifier = 1.0 + moraleFactor * -0.15 + (p.rating / 10.0) * 0.1;
-  demandModifier = Math.max(0.8, Math.min(demandModifier, 1.4));
+  demandModifier = Math.max(settings.demandModifierMin, Math.min(demandModifier, settings.demandModifierMax));
   const salary = round2(marketValue * demandModifier);
   const years = (p.age ?? 25) >= 31 ? choice([1, 2]) : choice([2, 3, 4]);
   return { salary, years };
@@ -122,13 +123,14 @@ export function evaluateClubContracts(
         detail: `Cut low-impact player ($${player.salary ?? 0}M) to save cap space.`,
       });
     } else {
-      const paycut = round2(demand.salary * 0.85);
+      const paycut = round2(demand.salary * (1 - settings.veteranPaycut));
+      const cutPct = Math.round(settings.veteranPaycut * 100);
       const acceptanceChance = 30 + (player.morale ?? 50) * 0.5;
       if (randInt(1, 100) <= acceptanceChance) {
         roster[idx] = { ...player, salary: paycut, contractYears: demand.years };
         actions.push({
           type: "NEGOTIATED", team: team.name, player: player.name,
-          detail: `Accepted a 15% paycut ($${paycut}M for ${demand.years}yrs).`,
+          detail: `Accepted a ${cutPct}% paycut ($${paycut}M for ${demand.years}yrs).`,
         });
       } else {
         freed.push({ ...player, contractYears: 0 });
@@ -176,7 +178,7 @@ export function runContractCycle(state: LeagueState): {
 
   // 2. Front-office decisions (non-exempt clubs only).
   for (const name of state.teamOrder) {
-    if (CONTRACT_EXEMPT_TEAMS.has(name)) continue;
+    if (isContractExempt(name)) continue;
     const { players, freed, actions: a } = evaluateClubContracts(teams[name], salaryCap);
     teams[name] = { ...teams[name], players };
     freeAgents.push(...freed);
@@ -185,7 +187,7 @@ export function runContractCycle(state: LeagueState): {
 
   // 3. Emergency roster filling (non-exempt clubs), richest cap headroom first.
   const order = state.teamOrder
-    .filter((n) => !CONTRACT_EXEMPT_TEAMS.has(n))
+    .filter((n) => !isContractExempt(n))
     .sort((a, b) => (salaryCap - payrollOf(teams[a])) - (salaryCap - payrollOf(teams[b])))
     .reverse();
 

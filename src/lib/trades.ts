@@ -2,6 +2,7 @@
 // reference (player valuation, team utility, fair-deal pre-flight). Used to
 // auto-generate weekly trade proposals across the whole league market at once.
 import type { LeaguePlayer, LeagueState, LeagueTeam } from "@/state/league";
+import { settings } from "@/lib/engine-settings";
 
 // ---------------- Budget parsing / formatting ----------------
 // Budgets are stored as display strings like "$21M" / "$24.6M". The algorithm
@@ -129,13 +130,13 @@ function isSurplus(squad: Squad, g: PosKey): boolean {
 
 function squadUtility(squad: Squad): number {
   const activeRating = sum(squad.active.map((p) => p.rating));
-  const benchRating = sum(squad.bench.map((p) => p.rating)) * 0.4;
+  const benchRating = sum(squad.bench.map((p) => p.rating)) * settings.benchRatingWeight;
   const counts = countPositions([...squad.active, ...squad.bench]);
   let scarcity = 0;
   if (counts.GK < 1) scarcity += 15.0;
   if (counts.DEF < 3) scarcity += 10.0;
   if (counts.ATT < 2) scarcity += 8.0;
-  const cashUtility = squad.budgetM * 0.25;
+  const cashUtility = squad.budgetM * settings.cashUtilityWeight;
   return activeRating + benchRating - scarcity + cashUtility;
 }
 
@@ -276,7 +277,7 @@ export function generateTradeProposals(state: LeagueState): TradeProposal[] {
   // Surface every deal above the utility threshold, best first (capped).
   deals.sort((a, b) => b.deltaUA + b.deltaUB - (a.deltaUA + a.deltaUB));
   return deals
-    .filter((d) => d.deltaUA + d.deltaUB >= UTILITY_THRESHOLD)
+    .filter((d) => d.deltaUA + d.deltaUB >= settings.utilityThreshold)
     .slice(0, MAX_SURFACED);
 }
 
