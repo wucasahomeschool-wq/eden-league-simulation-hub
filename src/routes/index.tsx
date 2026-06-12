@@ -91,17 +91,29 @@ function Hub() {
 }
 
 function UndoButton() {
-  const { undo, canUndo } = useLeague();
+  const { undo, redo, canUndo, canRedo } = useLeague();
   return (
-    <Button
-      size="sm"
-      variant="outline"
-      onClick={undo}
-      disabled={!canUndo}
-      title="Undo the last action across any suite"
-      className="font-semibold"
-    >
-      ↶ UNDO
-    </Button>
+    <div className="flex items-center gap-1.5">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={undo}
+        disabled={!canUndo}
+        title="Undo the last action across any suite"
+        className="font-semibold"
+      >
+        ↶ UNDO
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={redo}
+        disabled={!canRedo}
+        title="Redo the last undone action"
+        className="font-semibold"
+      >
+        ↷ REDO
+      </Button>
+    </div>
   );
 }
