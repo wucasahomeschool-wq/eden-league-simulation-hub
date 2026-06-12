@@ -30,6 +30,13 @@ const NUM_COLS: { key: AttrKey; label: string }[] = [
   { key: "AER", label: "AER" },
 ];
 
+// Base tactical identities the simulation engine scores against.
+const TACTICAL_STYLES = [
+  "Balanced", "Possession", "Counterattack", "Deep Block", "Chaos Attack", "High Press",
+] as const;
+
+
+
 
 function weeksLabel(weeks: number): string {
   if (weeks >= SEASON_ENDING_WEEKS) return "Season";
