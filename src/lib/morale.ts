@@ -3,11 +3,13 @@
 // Individual Player Morale (0–100, baseline 50), drives a dynamic event matrix,
 // scales match-simulation weights, and triggers AI managerial sackings.
 import type { LeaguePlayer, LeagueTeam } from "@/state/league";
+import { settings } from "@/lib/engine-settings";
 
 // Manual score-entry clubs bypass player-level micro events (their match
 // details are never simulated). Team-level macro events still apply to them.
 export const EXEMPT_TEAMS = new Set(["Gugu Team", "Spams", "Socks"]);
 
+// Default reference values (the live, editable values live in engine-settings).
 export const MORALE_BASELINE = 50;
 export const SACK_THRESHOLD = 25;
 export const MANAGER_RENEWAL_MORALE = 60;
@@ -15,13 +17,15 @@ export const HIGH_MORALE = 75;
 export const LOW_MORALE = 35;
 
 // Offseason morale regression: morale carries into the next season but is
-// nudged back toward the 50 baseline by up to 7 points. Anything within 7
-// points of 50 snaps exactly to 50.
+// nudged back toward the baseline by up to `seasonMoraleReset` points. Anything
+// within that many points of the baseline snaps exactly to the baseline.
 export const SEASON_MORALE_RESET = 7;
 export function carryOverMorale(morale: number): number {
-  const m = morale ?? MORALE_BASELINE;
-  if (Math.abs(m - MORALE_BASELINE) <= SEASON_MORALE_RESET) return MORALE_BASELINE;
-  return m > MORALE_BASELINE ? m - SEASON_MORALE_RESET : m + SEASON_MORALE_RESET;
+  const baseline = settings.moraleBaseline;
+  const reset = settings.seasonMoraleReset;
+  const m = morale ?? baseline;
+  if (Math.abs(m - baseline) <= reset) return baseline;
+  return m > baseline ? m - reset : m + reset;
 }
 
 // --- TEAM MORALE POINT MATRIX (engine reference values) ---
