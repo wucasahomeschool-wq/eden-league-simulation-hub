@@ -4,6 +4,7 @@ import {
 } from "@/state/league";
 import { SimulationTerminal } from "@/components/SimulationTerminal";
 import { MatchCommentaryDialog } from "@/components/MatchCommentaryDialog";
+import { downloadWeekExport } from "@/lib/league-export";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
@@ -62,17 +63,31 @@ export function ScheduleSuite() {
         {weeks.map(([week, fixtures]) => {
           const isActive = week === state.currentWeek;
           const isFinalFour = week >= 13;
+          const weekComplete = fixtures.length > 0 && fixtures.every((f) => state.results[f.id]);
           return (
             <section key={week} className="rounded-xl border bg-card">
-              <header className="flex items-center justify-between border-b px-4 py-2.5">
+              <header className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
                 <h3 className="text-sm font-bold uppercase tracking-wide">
                   {isFinalFour ? `Final Four · Week ${week}` : `Week ${week}`}
                 </h3>
-                {isActive && (
-                  <span className="rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold uppercase text-primary-foreground">
-                    Active
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {weekComplete && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-2 text-[11px] font-semibold text-primary"
+                      onClick={() => downloadWeekExport(state, week)}
+                      title="Download this week's results, commentary and Team Editor data as JSON"
+                    >
+                      ⬇ EXPORT FINISHED WEEK DATA
+                    </Button>
+                  )}
+                  {isActive && (
+                    <span className="rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold uppercase text-primary-foreground">
+                      Active
+                    </span>
+                  )}
+                </div>
               </header>
               <ul className="divide-y">
                 {fixtures.map((fx) => {
