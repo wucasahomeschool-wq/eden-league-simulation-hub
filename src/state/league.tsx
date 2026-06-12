@@ -10,7 +10,7 @@ import { computeStartingAge, ageOnePlayer } from "@/lib/aging";
 import { buildMatchPayload, type MatchPayload } from "@/lib/match-payload";
 import {
   applyTeamEvent, applyPlayerEvent, moraleScaledAttrs, MORALE_BASELINE,
-  EXEMPT_TEAMS, clampMorale,
+  EXEMPT_TEAMS, clampMorale, carryOverMorale,
 } from "@/lib/morale";
 import {
   generateTradeProposals, parseBudget, formatBudget, type TradeProposal,
@@ -840,7 +840,9 @@ function offseasonTeam(team: LeagueTeam): LeagueTeam {
     players.push(res.retired ? res.replacement! : res.player);
   }
   // Veteran fulfillment lifts overall club morale slightly.
-  const morale = Math.max(0, Math.min(100, team.morale + moraleBump * 2));
+  // Morale carries into the next season, then regresses 7 points toward the
+  // 50 baseline; veteran fulfilment adds a small bump on top.
+  const morale = Math.max(0, Math.min(100, carryOverMorale(team.morale) + moraleBump * 2));
   const lineup = buildDefaultLineup(players, team.formation);
   return syncStarters({ ...team, players, morale, lineup });
 }
