@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { supabase } from "@/integrations/supabase/client";
 import { RAW_TEAMS } from "@/data/rosters";
 import { INITIAL_BUDGETS } from "@/data/budgets";
-import { INITIAL_SCHEDULE, MANUAL_ONLY_TEAMS } from "@/data/schedule";
+import { INITIAL_SCHEDULE } from "@/data/schedule";
 import { buildEngineTeam, run_match } from "@/engine/engine";
 import { computeOverall } from "@/lib/ratings";
 import { computeStartingAge, ageOnePlayer } from "@/lib/aging";
@@ -11,13 +11,13 @@ import { buildMatchPayload, type MatchPayload } from "@/lib/match-payload";
 import type { VersionData } from "@/lib/league-export";
 import {
   applyTeamEvent, applyPlayerEvent, moraleScaledAttrs, MORALE_BASELINE,
-  EXEMPT_TEAMS, clampMorale, carryOverMorale,
+  clampMorale, carryOverMorale,
 } from "@/lib/morale";
 import {
   generateTradeProposals, parseBudget, formatBudget, type TradeProposal,
 } from "@/lib/trades";
 import { initializeContracts, calculateMarketValue, payrollOf, runContractCycle as runCycle, type ContractAction } from "@/lib/contracts";
-import { applySettings, getSettings, DEFAULT_SETTINGS, settings as engineSettings, type EngineSettings } from "@/lib/engine-settings";
+import { applySettings, getSettings, DEFAULT_SETTINGS, settings as engineSettings, isManualSimTeam, type EngineSettings } from "@/lib/engine-settings";
 
 const STORAGE_KEY = "eden_league_state_v6";
 const LEGACY_STORAGE_KEYS = ["eden_league_state_v5", "eden_league_state_v4", "eden_league_state_v3", "eden_league_state_v2", "eden_league_state_v1"];
@@ -511,7 +511,7 @@ function advancePlayoffs(playoffs: PlayoffsState): PlayoffsState {
 }
 
 export function isManualOnly(home: string, away: string): boolean {
-  return MANUAL_ONLY_TEAMS.includes(home) || MANUAL_ONLY_TEAMS.includes(away);
+  return isManualSimTeam(home) || isManualSimTeam(away);
 }
 
 // Build the ordered roster for the engine: available starters first, then
@@ -985,7 +985,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     for (const name of next.teamOrder) {
       const t = next.teams[name];
       const inLineup = new Set(t.lineup.filter(Boolean));
-      const exempt = EXEMPT_TEAMS.has(name);
+      const exempt = isManualSimTeam(name);
       const players = t.players.map((p) => {
         let np = p;
         if (!protectedKeys.has(`${name}::${p.name}`) && (p.injuryWeeks > 0 || p.suspensionWeeks > 0)) {

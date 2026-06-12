@@ -3,11 +3,11 @@
 // Individual Player Morale (0–100, baseline 50), drives a dynamic event matrix,
 // scales match-simulation weights, and triggers AI managerial sackings.
 import type { LeaguePlayer, LeagueTeam } from "@/state/league";
-import { settings } from "@/lib/engine-settings";
+import { settings, isManualSimTeam } from "@/lib/engine-settings";
 
 // Manual score-entry clubs bypass player-level micro events (their match
 // details are never simulated). Team-level macro events still apply to them.
-export const EXEMPT_TEAMS = new Set(["Gugu Team", "Spams", "Socks"]);
+// The live list lives in engine-settings (editable in the Settings suite).
 
 // Default reference values (the live, editable values live in engine-settings).
 export const MORALE_BASELINE = 50;
@@ -93,7 +93,7 @@ export function applyPlayerEvent(
   player: LeaguePlayer,
   event: PlayerEvent
 ): void {
-  if (EXEMPT_TEAMS.has(team.name)) return;
+  if (isManualSimTeam(team.name)) return;
   player.morale = clampMorale((player.morale ?? settings.moraleBaseline) + PLAYER_EVENTS[event]);
 }
 
