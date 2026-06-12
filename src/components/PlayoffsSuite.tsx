@@ -4,6 +4,7 @@ import {
   PLAYOFF_ROUND_NAMES, type PlayoffMatch,
 } from "@/state/league";
 import { SimulationTerminal } from "@/components/SimulationTerminal";
+import { MatchCommentaryDialog } from "@/components/MatchCommentaryDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -14,6 +15,7 @@ export function PlayoffsSuite() {
   const { state, generatePlayoffs, setPlayoffResult } = useLeague();
   const [simMatch, setSimMatch] = useState<PlayoffMatch | null>(null);
   const [manualMatch, setManualMatch] = useState<PlayoffMatch | null>(null);
+  const [commentaryMatch, setCommentaryMatch] = useState<PlayoffMatch | null>(null);
 
   const week16Done = isWeekComplete(state, 16);
   const playoffs = state.playoffs;
@@ -133,6 +135,18 @@ export function PlayoffsSuite() {
                           Tie — re-enter a result with a winner to advance
                         </p>
                       )}
+                      {m.result?.method === "SIM" && (
+                        <div className="mt-1 flex justify-center">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2 text-[11px] font-semibold text-primary"
+                            onClick={() => setCommentaryMatch(m)}
+                          >
+                            VIEW MATCH COMMENTARY
+                          </Button>
+                        </div>
+                      )}
                     </li>
                   );
                 })}
@@ -162,6 +176,13 @@ export function PlayoffsSuite() {
           if (manualMatch) setPlayoffResult(manualMatch.id, h, a, "MANUAL");
           setManualMatch(null);
         }}
+      />
+
+      <MatchCommentaryDialog
+        open={!!commentaryMatch}
+        onClose={() => setCommentaryMatch(null)}
+        title={commentaryMatch ? `${commentaryMatch.home} vs ${commentaryMatch.away}` : ""}
+        log={commentaryMatch ? state.payloads[commentaryMatch.id]?.log : undefined}
       />
     </div>
   );

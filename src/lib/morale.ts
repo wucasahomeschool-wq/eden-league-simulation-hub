@@ -14,6 +14,16 @@ export const MANAGER_RENEWAL_MORALE = 60;
 export const HIGH_MORALE = 75;
 export const LOW_MORALE = 35;
 
+// Offseason morale regression: morale carries into the next season but is
+// nudged back toward the 50 baseline by up to 7 points. Anything within 7
+// points of 50 snaps exactly to 50.
+export const SEASON_MORALE_RESET = 7;
+export function carryOverMorale(morale: number): number {
+  const m = morale ?? MORALE_BASELINE;
+  if (Math.abs(m - MORALE_BASELINE) <= SEASON_MORALE_RESET) return MORALE_BASELINE;
+  return m > MORALE_BASELINE ? m - SEASON_MORALE_RESET : m + SEASON_MORALE_RESET;
+}
+
 // --- TEAM MORALE POINT MATRIX (engine reference values) ---
 export const TEAM_EVENTS = {
   elite_victory: 12, // Victory against a top-5 ranked team

@@ -81,7 +81,7 @@ export function SimulationTerminal({
         timerRef.current = null;
         setScore({ h: result.homeGoals, a: result.awayGoals });
         setRunning(false);
-        onComplete?.(result.homeGoals, result.awayGoals, result.payload);
+        onComplete?.(result.homeGoals, result.awayGoals, { ...result.payload, log: fullLog });
       }
     }, 45);
   }

@@ -10,7 +10,7 @@ import { computeStartingAge, ageOnePlayer } from "@/lib/aging";
 import { buildMatchPayload, type MatchPayload } from "@/lib/match-payload";
 import {
   applyTeamEvent, applyPlayerEvent, moraleScaledAttrs, MORALE_BASELINE,
-  EXEMPT_TEAMS, clampMorale,
+  EXEMPT_TEAMS, clampMorale, carryOverMorale,
 } from "@/lib/morale";
 import {
   generateTradeProposals, parseBudget, formatBudget, type TradeProposal,
@@ -106,6 +106,7 @@ export interface LeagueState {
   playoffs?: PlayoffsState;
   tradeProposals: TradeProposal[];
   undoStack: string[]; // serialized prior states (universal undo)
+  redoStack: string[]; // serialized undone states (universal redo)
   salaryCap: number; // league-wide hard salary cap ($M)
   freeAgents: LeaguePlayer[]; // unattached players available for free signing
   contractsInitialized: boolean; // first-boot compliance setup complete
@@ -282,7 +283,7 @@ export function initState(): LeagueState {
   const { teams: capTeams, salaryCap } = initializeContracts(teams, teamOrder);
   return {
     currentWeek: 1, season: 1, teamOrder, teams: capTeams, fixtures,
-    results: {}, payloads: {}, tradeProposals: [], undoStack: [],
+    results: {}, payloads: {}, tradeProposals: [], undoStack: [], redoStack: [],
     salaryCap, freeAgents: [], contractsInitialized: true,
   };
 }
@@ -339,6 +340,7 @@ function normalize(state: LeagueState): LeagueState {
     tradeProposals: state.tradeProposals ?? [],
     payloads: state.payloads ?? {},
     undoStack: state.undoStack ?? [],
+    redoStack: state.redoStack ?? [],
     teams: outTeams,
     salaryCap,
     freeAgents: state.freeAgents ?? [],
@@ -698,7 +700,10 @@ interface LeagueContextValue {
     payload?: MatchPayload
   ) => void;
   undo: () => void;
+  redo: () => void;
   canUndo: boolean;
+  canRedo: boolean;
+  setSalaryCap: (cap: number) => void;
   updateBudget: (team: string, budget: string) => void;
   updatePlayer: (team: string, index: number, patch: Partial<LeaguePlayer>) => void;
   setLineupSlot: (team: string, slot: number, playerName: string) => void;
@@ -838,7 +843,9 @@ function offseasonTeam(team: LeagueTeam): LeagueTeam {
     players.push(res.retired ? res.replacement! : res.player);
   }
   // Veteran fulfillment lifts overall club morale slightly.
-  const morale = Math.max(0, Math.min(100, team.morale + moraleBump * 2));
+  // Morale carries into the next season, then regresses 7 points toward the
+  // 50 baseline; veteran fulfilment adds a small bump on top.
+  const morale = Math.max(0, Math.min(100, carryOverMorale(team.morale) + moraleBump * 2));
   const lineup = buildDefaultLineup(players, team.formation);
   return syncStarters({ ...team, players, morale, lineup });
 }
@@ -859,8 +866,8 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   // Persist the live league document to Cloud (undo history is kept local only).
   function pushToCloud(snapshot: LeagueState) {
     const nextVersion = versionRef.current + 1;
-    const { undoStack: _ignore, ...rest } = snapshot;
-    const data = { ...rest, undoStack: [] };
+    const { undoStack: _ignore, redoStack: _ignore2, ...rest } = snapshot;
+    const data = { ...rest, undoStack: [], redoStack: [] };
     versionRef.current = nextVersion;
     selfVersionRef.current = nextVersion;
     void supabase
@@ -884,7 +891,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       if (!error && data) {
         versionRef.current = data.version ?? 1;
         applyingRemoteRef.current = true;
-        setState((prev) => normalize({ ...(data.data as unknown as LeagueState), undoStack: prev.undoStack }));
+        setState((prev) => normalize({ ...(data.data as unknown as LeagueState), undoStack: prev.undoStack, redoStack: prev.redoStack }));
       } else {
         // No shared league yet — seed it from whatever this browser currently has.
         setState((prev) => {
@@ -908,7 +915,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
           if (row.version <= versionRef.current) return; // stale
           versionRef.current = row.version;
           applyingRemoteRef.current = true;
-          setState((prev) => normalize({ ...(row.data as LeagueState), undoStack: prev.undoStack }));
+          setState((prev) => normalize({ ...(row.data as LeagueState), undoStack: prev.undoStack, redoStack: prev.redoStack }));
         }
       )
       .subscribe();
@@ -943,13 +950,14 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   const standings = useMemo(() => computeStandings(state), [state]);
   const leaderboards = useMemo(() => computeLeaderboards(state), [state]);
 
-  // Universal undo: every mutating action snapshots the prior state.
+  // Universal undo: every mutating action snapshots the prior state and clears
+  // the redo stack (a fresh action invalidates any undone future).
   function update(producer: (prev: LeagueState) => LeagueState) {
     setState((prev) => {
       const next = producer(prev);
       if (next === prev) return prev;
-      const snap = JSON.stringify({ ...prev, undoStack: [] });
-      return { ...next, undoStack: [...prev.undoStack, snap].slice(-MAX_UNDO) };
+      const snap = JSON.stringify({ ...prev, undoStack: [], redoStack: [] });
+      return { ...next, undoStack: [...prev.undoStack, snap].slice(-MAX_UNDO), redoStack: [] };
     });
   }
 
@@ -1006,6 +1014,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     standings,
     leaderboards,
     canUndo: state.undoStack.length > 0,
+    canRedo: state.redoStack.length > 0,
     setResult: (fixtureId, homeGoals, awayGoals, method, payload) =>
       update((prev) => {
         const fixture = prev.fixtures.find((f) => f.id === fixtureId);
@@ -1031,7 +1040,29 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         const last = stack.pop()!;
         try {
           const restored = JSON.parse(last) as LeagueState;
-          return normalize({ ...restored, undoStack: stack });
+          const redoSnap = JSON.stringify({ ...prev, undoStack: [], redoStack: [] });
+          return normalize({
+            ...restored,
+            undoStack: stack,
+            redoStack: [...prev.redoStack, redoSnap].slice(-MAX_UNDO),
+          });
+        } catch {
+          return prev;
+        }
+      }),
+    redo: () =>
+      setState((prev) => {
+        if (!prev.redoStack.length) return prev;
+        const stack = [...prev.redoStack];
+        const last = stack.pop()!;
+        try {
+          const restored = JSON.parse(last) as LeagueState;
+          const undoSnap = JSON.stringify({ ...prev, undoStack: [], redoStack: [] });
+          return normalize({
+            ...restored,
+            redoStack: stack,
+            undoStack: [...prev.undoStack, undoSnap].slice(-MAX_UNDO),
+          });
         } catch {
           return prev;
         }
@@ -1319,6 +1350,15 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       }));
       return r.actions;
     },
+    setSalaryCap: (cap) =>
+      update((prev) => {
+        const next = Math.max(0, Math.round(cap * 10) / 10);
+        const teams: Record<string, LeagueTeam> = {};
+        for (const name of prev.teamOrder) {
+          teams[name] = { ...prev.teams[name], salaryBudget: next };
+        }
+        return { ...prev, salaryCap: next, teams };
+      }),
     resetLeague: () => setState(initState()),
   };
 

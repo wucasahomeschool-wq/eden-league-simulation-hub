@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLeague } from "@/state/league";
 import { CONTRACT_EXEMPT_TEAMS, type ContractAction } from "@/lib/contracts";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -15,20 +16,50 @@ const ACTION_TONE: Record<ContractAction["type"], string> = {
 };
 
 export function ContractsSuite() {
-  const { state, runContractCycle, signFreeAgent } = useLeague();
+  const { state, runContractCycle, signFreeAgent, setSalaryCap } = useLeague();
   const [log, setLog] = useState<ContractAction[]>([]);
   const [ran, setRan] = useState(false);
   const [signTo, setSignTo] = useState(state.teamOrder[0]);
+  const [capDraft, setCapDraft] = useState("");
 
   const cap = state.salaryCap ?? 0;
   const seasonOver = !!state.playoffs?.champion;
   const freeAgents = state.freeAgents ?? [];
+
+  function commitCap() {
+    const v = parseFloat(capDraft);
+    if (!Number.isNaN(v) && v > 0) setSalaryCap(v);
+    setCapDraft("");
+  }
+
 
   function handleRun() {
     const actions = runContractCycle();
     setLog(actions);
     setRan(true);
   }
+
+  const capEditor = (
+    <div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Hard Salary Cap</div>
+      <div className="mt-1 flex items-center gap-2">
+        <span className="font-mono text-2xl font-extrabold text-primary">${cap.toFixed(1)}M</span>
+        <Input
+          type="number"
+          min={1}
+          step={1}
+          value={capDraft}
+          placeholder="edit"
+          onChange={(e) => setCapDraft(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && commitCap()}
+          className="h-8 w-24 text-center font-mono"
+        />
+        <Button size="sm" variant="secondary" onClick={commitCap} disabled={!capDraft}>
+          SET CAP
+        </Button>
+      </div>
+    </div>
+  );
 
   if (!seasonOver) {
     return (
@@ -38,6 +69,7 @@ export function ContractsSuite() {
           The Contracts suite opens once the season has ended (a playoff champion is crowned). Finish the
           playoffs to run the offseason contract cycle, free agency and salary-cap compliance.
         </p>
+        <div className="mt-6 flex justify-center">{capEditor}</div>
       </div>
     );
   }
@@ -45,10 +77,7 @@ export function ContractsSuite() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-card/70 p-4 shadow-lg">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Hard Salary Cap</div>
-          <div className="font-mono text-2xl font-extrabold text-primary">${cap.toFixed(1)}M</div>
-        </div>
+        {capEditor}
         <p className="max-w-xl text-xs text-muted-foreground">
           Run the offseason cycle to decay all contracts by one year, let the AI front offices of the 22
           non-exempt clubs re-sign, negotiate or release expiring players, and emergency-fill any roster

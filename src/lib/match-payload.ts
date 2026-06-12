@@ -34,6 +34,7 @@ export interface MatchPayload {
   players: PlayerMatchStat[];
   goalkeepers: GoalkeeperMatchStat[];
   injuries: { team: string; name: string }[];
+  log?: string[]; // full match commentary, retained for later viewing
 }
 
 export function buildMatchPayload(

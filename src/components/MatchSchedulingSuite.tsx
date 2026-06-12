@@ -17,12 +17,12 @@ export function MatchSchedulingSuite() {
       <div className="space-y-4">
         <Banner
           title={`Schedule the Final Four · Season ${state.season}`}
-          body="Week 12 is complete. Enter the four AI-generated Final Four fixtures (Weeks 13–16). Pick the two clubs for each match from the dropdowns. Saving adds these weeks to the Season Schedule."
+          body="Week 12 is complete. The Final Four spans FOUR full weeks (Weeks 13–16) — schedule all 48 fixtures (12 matches per week, every team plays once a week). Pick the two clubs for each match, add them week by week, then save to append these weeks to the Season Schedule."
         />
         <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
           <FixtureBuilder
             weeks={FINAL_FOUR_WEEKS}
-            title="Final Four Builder (Weeks 13–16)"
+            title="Final Four Builder (Weeks 13–16 · 12 matches each)"
             commit={scheduleFinalFour}
             saveLabelOverride="SAVE FINAL FOUR"
           />

@@ -31,15 +31,18 @@ export function payrollOf(team: LeagueTeam): number {
   return round2(team.players.reduce((s, p) => s + (p.salary ?? 0), 0));
 }
 
+// League-wide Hard Salary Cap ($M). Lowered to make the offseason tighter so
+// clubs must pick and choose their players. Editable in the Contracts suite.
+export const DEFAULT_SALARY_CAP = 140;
+
 // ---------------- First-time compliance initialization ----------------------
 // Pays every player exactly their market value, assigns a random 1–4yr deal,
-// then declares the highest club payroll as the global Hard Salary Cap.
+// then applies the global Hard Salary Cap as every club's payroll ceiling.
 export function initializeContracts(
   teams: Record<string, LeagueTeam>,
   teamOrder: string[]
 ): { teams: Record<string, LeagueTeam>; salaryCap: number } {
   const next: Record<string, LeagueTeam> = {};
-  let maxPayroll = 0;
   for (const name of teamOrder) {
     const t = teams[name];
     const players = t.players.map((p) => ({
@@ -47,12 +50,9 @@ export function initializeContracts(
       salary: calculateMarketValue(p.rating),
       contractYears: randInt(1, 4),
     }));
-    const team = { ...t, players };
-    next[name] = team;
-    const payroll = payrollOf(team);
-    if (payroll > maxPayroll) maxPayroll = payroll;
+    next[name] = { ...t, players };
   }
-  const salaryCap = round2(maxPayroll);
+  const salaryCap = DEFAULT_SALARY_CAP;
   for (const name of teamOrder) {
     next[name] = { ...next[name], salaryBudget: salaryCap };
   }

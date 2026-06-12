@@ -3,6 +3,7 @@ import {
   useLeague, isManualOnly, isWeekComplete, type FixtureEntry,
 } from "@/state/league";
 import { SimulationTerminal } from "@/components/SimulationTerminal";
+import { MatchCommentaryDialog } from "@/components/MatchCommentaryDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
@@ -13,6 +14,7 @@ export function ScheduleSuite() {
   const { state, setResult } = useLeague();
   const [simFixture, setSimFixture] = useState<FixtureEntry | null>(null);
   const [manualFixture, setManualFixture] = useState<FixtureEntry | null>(null);
+  const [commentaryFixture, setCommentaryFixture] = useState<FixtureEntry | null>(null);
 
   const weeks = useMemo(() => {
     const map = new Map<number, FixtureEntry[]>();
@@ -102,10 +104,20 @@ export function ScheduleSuite() {
                         </div>
                       )}
                       {r && (
-                        <div className="col-span-3 mt-0.5 flex items-center justify-center gap-3">
+                        <div className="col-span-3 mt-0.5 flex flex-wrap items-center justify-center gap-3">
                           <span className="text-[10px] uppercase text-muted-foreground">
                             {r.method === "SIM" ? "Simulated" : "Manual entry"}
                           </span>
+                          {r.method === "SIM" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-2 text-[11px] font-semibold text-primary"
+                              onClick={() => setCommentaryFixture(fx)}
+                            >
+                              VIEW MATCH COMMENTARY
+                            </Button>
+                          )}
                         </div>
                       )}
                     </li>
@@ -156,6 +168,14 @@ export function ScheduleSuite() {
           if (manualFixture) setResult(manualFixture.id, h, a, "MANUAL");
           setManualFixture(null);
         }}
+      />
+
+      {/* Match commentary viewer */}
+      <MatchCommentaryDialog
+        open={!!commentaryFixture}
+        onClose={() => setCommentaryFixture(null)}
+        title={commentaryFixture ? `${commentaryFixture.home} vs ${commentaryFixture.away}` : ""}
+        log={commentaryFixture ? state.payloads[commentaryFixture.id]?.log : undefined}
       />
     </div>
   );
