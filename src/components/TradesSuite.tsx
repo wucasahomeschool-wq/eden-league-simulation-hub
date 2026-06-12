@@ -68,7 +68,7 @@ export function TradesSuite() {
               <ProposalCard
                 key={t.id}
                 t={t}
-                onAccept={() => executeTrade(t)}
+                onAccept={() => acceptProposal(t)}
                 onDecline={() => declineTrade(t.id)}
               />
             ))}
@@ -79,7 +79,7 @@ export function TradesSuite() {
       {/* MANUAL SECTION */}
       <section>
         <h2 className="mb-3 text-base font-extrabold uppercase tracking-wide">Manual Trade Builder</h2>
-        <ManualTrade teams={state.teamOrder.map((n) => state.teams[n])} onSubmit={executeManualTrade} />
+        <ManualTrade teams={state.teamOrder.map((n) => state.teams[n])} onSubmit={submitManualTrade} />
       </section>
     </div>
   );
@@ -122,7 +122,7 @@ function ManualTrade({
   teams, onSubmit,
 }: {
   teams: LeagueTeam[];
-  onSubmit: (teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashA: number, cashB: number) => void;
+  onSubmit: (teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashA: number, cashB: number) => boolean;
 }) {
   const [teamAName, setTeamAName] = useState(teams[0].name);
   const [teamBName, setTeamBName] = useState(teams[1].name);
@@ -147,11 +147,12 @@ function ManualTrade({
 
   function submit() {
     if (sameTeam || nothing) return;
-    onSubmit(
+    const ok = onSubmit(
       teamAName, teamBName, validA, validB,
       Math.max(0, parseFloat(cashAReceives) || 0),
       Math.max(0, parseFloat(cashBReceives) || 0),
     );
+    if (!ok) return; // keep the form intact so the deal can be adjusted
     setAPlayers([]); setBPlayers([]); setCashAReceives("0"); setCashBReceives("0");
   }
 
