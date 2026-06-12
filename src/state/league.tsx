@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { supabase } from "@/integrations/supabase/client";
 import { RAW_TEAMS } from "@/data/rosters";
 import { INITIAL_BUDGETS } from "@/data/budgets";
-import { INITIAL_SCHEDULE, MANUAL_ONLY_TEAMS } from "@/data/schedule";
+import { INITIAL_SCHEDULE } from "@/data/schedule";
 import { buildEngineTeam, run_match } from "@/engine/engine";
 import { computeOverall } from "@/lib/ratings";
 import { computeStartingAge, ageOnePlayer } from "@/lib/aging";
