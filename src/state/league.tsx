@@ -947,13 +947,14 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   const standings = useMemo(() => computeStandings(state), [state]);
   const leaderboards = useMemo(() => computeLeaderboards(state), [state]);
 
-  // Universal undo: every mutating action snapshots the prior state.
+  // Universal undo: every mutating action snapshots the prior state and clears
+  // the redo stack (a fresh action invalidates any undone future).
   function update(producer: (prev: LeagueState) => LeagueState) {
     setState((prev) => {
       const next = producer(prev);
       if (next === prev) return prev;
-      const snap = JSON.stringify({ ...prev, undoStack: [] });
-      return { ...next, undoStack: [...prev.undoStack, snap].slice(-MAX_UNDO) };
+      const snap = JSON.stringify({ ...prev, undoStack: [], redoStack: [] });
+      return { ...next, undoStack: [...prev.undoStack, snap].slice(-MAX_UNDO), redoStack: [] };
     });
   }
 
