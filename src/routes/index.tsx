@@ -9,6 +9,9 @@ import { PlayoffsSuite } from "@/components/PlayoffsSuite";
 import { MatchSchedulingSuite } from "@/components/MatchSchedulingSuite";
 import { TradesSuite } from "@/components/TradesSuite";
 import { ContractsSuite } from "@/components/ContractsSuite";
+import { SettingsSuite } from "@/components/SettingsSuite";
+import { SaveVersionButton } from "@/components/SaveVersionButton";
+import { downloadLeagueExport } from "@/lib/league-export";
 import { Button } from "@/components/ui/button";
 import edenLogo from "@/assets/eden-league-logo.png.asset.json";
 
@@ -37,6 +40,7 @@ const SUITES = [
   { name: "Trades", render: () => <TradesSuite /> },
   { name: "Contracts", render: () => <ContractsSuite /> },
   { name: "Team Editor", render: () => <TeamEditorSuite /> },
+  { name: "Settings & Version Archives", render: () => <SettingsSuite /> },
 ];
 
 function Hub() {
