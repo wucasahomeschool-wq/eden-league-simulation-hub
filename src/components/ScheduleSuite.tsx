@@ -169,6 +169,14 @@ export function ScheduleSuite() {
           setManualFixture(null);
         }}
       />
+
+      {/* Match commentary viewer */}
+      <MatchCommentaryDialog
+        open={!!commentaryFixture}
+        onClose={() => setCommentaryFixture(null)}
+        title={commentaryFixture ? `${commentaryFixture.home} vs ${commentaryFixture.away}` : ""}
+        log={commentaryFixture ? state.payloads[commentaryFixture.id]?.log : undefined}
+      />
     </div>
   );
 }
