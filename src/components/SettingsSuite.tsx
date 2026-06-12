@@ -279,14 +279,14 @@ function SelectSetting({
 
 // Multi-select for contract-exempt clubs.
 function ExemptSetting({
-  teamOrder, selected, onChange,
-}: { teamOrder: string[]; selected: string[]; onChange: (list: string[]) => void }) {
+  teamOrder, selected, onChange, label = "Exempt clubs (auto contract engine skips these)",
+}: { teamOrder: string[]; selected: string[]; onChange: (list: string[]) => void; label?: string }) {
   function toggle(name: string) {
     onChange(selected.includes(name) ? selected.filter((n) => n !== name) : [...selected, name]);
   }
   return (
     <div className="py-2 text-sm">
-      <div className="mb-1.5 text-muted-foreground">Exempt clubs (auto contract engine skips these)</div>
+      <div className="mb-1.5 text-muted-foreground">{label}</div>
       <div className="flex flex-wrap gap-1.5">
         {teamOrder.map((name) => {
           const on = selected.includes(name);
