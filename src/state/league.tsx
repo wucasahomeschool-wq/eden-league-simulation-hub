@@ -1361,6 +1361,21 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         }
         return { ...prev, salaryCap: next, teams };
       }),
+    revertToVersion: (data) =>
+      update((prev) => normalize({
+        ...prev,
+        // Team Editor data is intentionally preserved (teams + teamOrder).
+        currentWeek: data.currentWeek ?? prev.currentWeek,
+        season: data.season ?? prev.season,
+        fixtures: data.fixtures ?? prev.fixtures,
+        results: data.results ?? prev.results,
+        payloads: data.payloads ?? prev.payloads,
+        playoffs: data.playoffs,
+        tradeProposals: data.tradeProposals ?? [],
+        freeAgents: data.freeAgents ?? prev.freeAgents,
+        salaryCap: data.salaryCap ?? prev.salaryCap,
+        contractsInitialized: data.contractsInitialized ?? prev.contractsInitialized,
+      })),
     resetLeague: () => setState(initState()),
   };
 
