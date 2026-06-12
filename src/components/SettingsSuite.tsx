@@ -1,33 +1,47 @@
 import { useCallback, useEffect, useState } from "react";
-import { useLeague, TRANSFER_WINDOW_LAST_WEEK, DEFAULT_FORMATION } from "@/state/league";
-import { GOAL_MULTIPLIER_DEFAULT, IDENTITY_BOOST_WEIGHT } from "@/engine/engine";
-import { DEFAULT_SALARY_CAP, CONTRACT_EXEMPT_TEAMS } from "@/lib/contracts";
-import { UTILITY_THRESHOLD } from "@/lib/trades";
-import {
-  MORALE_BASELINE, SACK_THRESHOLD, MANAGER_RENEWAL_MORALE,
-  HIGH_MORALE, LOW_MORALE, SEASON_MORALE_RESET,
-} from "@/lib/morale";
+import { useLeague, DEFAULT_FORMATION } from "@/state/league";
+import { DEFAULT_SALARY_CAP } from "@/lib/contracts";
+import { DEFAULT_SETTINGS, type EngineSettings } from "@/lib/engine-settings";
 import { listVersions, deleteVersion, type LeagueVersion } from "@/lib/versions";
 import { SaveVersionButton } from "@/components/SaveVersionButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 
 export function SettingsSuite() {
-  const { state, setSalaryCap, revertToVersion } = useLeague();
+  const { state, setSalaryCap, setSettings, revertToVersion } = useLeague();
+  const s: EngineSettings = state.settings ?? DEFAULT_SETTINGS;
 
   return (
     <div className="space-y-6">
-      <LeagueSettings cap={state.salaryCap ?? 0} setSalaryCap={setSalaryCap} />
+      <LeagueSettings
+        s={s}
+        cap={state.salaryCap ?? 0}
+        teamOrder={state.teamOrder}
+        setSalaryCap={setSalaryCap}
+        setSettings={setSettings}
+      />
       <VersionArchive revertToVersion={revertToVersion} />
     </div>
   );
 }
 
-// ---------------- League Settings (reference) ----------------
-function LeagueSettings({ cap, setSalaryCap }: { cap: number; setSalaryCap: (n: number) => void }) {
+// ---------------- League Settings (all editable) ----------------
+function LeagueSettings({
+  s, cap, teamOrder, setSalaryCap, setSettings,
+}: {
+  s: EngineSettings;
+  cap: number;
+  teamOrder: string[];
+  setSalaryCap: (n: number) => void;
+  setSettings: (patch: Partial<EngineSettings>) => void;
+}) {
   const [capDraft, setCapDraft] = useState("");
 
   function commitCap() {
@@ -36,25 +50,57 @@ function LeagueSettings({ cap, setSalaryCap }: { cap: number; setSalaryCap: (n: 
     setCapDraft("");
   }
 
+  function resetAll() {
+    setSettings({ ...DEFAULT_SETTINGS, contractExemptTeams: [...DEFAULT_SETTINGS.contractExemptTeams] });
+  }
+
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-border bg-card/70 p-4 shadow-lg">
-        <h2 className="text-sm font-extrabold uppercase tracking-wide text-primary">League Settings</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Central reference for the engine and league rules. Most values are fixed in the
-          simulation engine (ported line-for-line from the Python reference); the Hard Salary Cap
-          is adjustable below.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border bg-card/70 p-4 shadow-lg">
+        <div>
+          <h2 className="text-sm font-extrabold uppercase tracking-wide text-primary">League Settings</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Every value below is a live tuning knob — the simulation, contract, trade and morale
+            engines read these in real time. Changes sync to the Cloud save instantly and are
+            covered by UNDO. Structural facts (team count, season length, formation, playoff
+            seeding) stay fixed.
+          </p>
+        </div>
+        <Button size="sm" variant="secondary" onClick={resetAll}>Reset to defaults</Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <SettingsCard title="Simulation Engine">
-          <Row label="Default tempo" value="Normal (1.2×) · Slow 1.0× / Fast 1.4×" />
-          <Row label="Goal multiplier (default)" value={`${GOAL_MULTIPLIER_DEFAULT}×`} />
-          <Row label="Identity boost weight" value={String(IDENTITY_BOOST_WEIGHT)} />
-          <Row label="Dynamic tactics" value="On (pre-match scouting + live shifts)" />
-          <Row label="Weather effects" value="On" />
-          <Row label="Playoff penalties" value="Skip extra time → shootout" />
+          <SelectSetting
+            label="Default tempo"
+            value={String(s.defaultTempo)}
+            options={[
+              { value: "1", label: "Slow (1.0×)" },
+              { value: "1.2", label: "Normal (1.2×)" },
+              { value: "1.4", label: "Fast (1.4×)" },
+            ]}
+            onChange={(v) => setSettings({ defaultTempo: parseFloat(v) })}
+          />
+          <NumberSetting
+            label="Goal multiplier (default)" value={s.goalMultiplier} step={0.05} min={0.1} max={2}
+            onCommit={(v) => setSettings({ goalMultiplier: v })}
+          />
+          <NumberSetting
+            label="Identity boost weight" value={s.identityBoostWeight} step={0.1} min={0} max={5}
+            onCommit={(v) => setSettings({ identityBoostWeight: v })}
+          />
+          <ToggleSetting
+            label="Dynamic tactics (live shifts)" checked={s.dynamicTactics}
+            onChange={(v) => setSettings({ dynamicTactics: v })}
+          />
+          <ToggleSetting
+            label="Weather effects" checked={s.weatherEffects}
+            onChange={(v) => setSettings({ weatherEffects: v })}
+          />
+          <ToggleSetting
+            label="Playoff penalties (draw → shootout)" checked={s.playoffPenalties}
+            onChange={(v) => setSettings({ playoffPenalties: v })}
+          />
         </SettingsCard>
 
         <SettingsCard title="Contract Engine">
@@ -69,27 +115,71 @@ function LeagueSettings({ cap, setSalaryCap }: { cap: number; setSalaryCap: (n: 
             <Button size="sm" variant="secondary" onClick={commitCap} disabled={!capDraft}>SET CAP</Button>
           </div>
           <Row label="Default cap baseline" value={`$${DEFAULT_SALARY_CAP}M`} />
-          <Row label="Demand modifier range" value="0.8× – 1.4× (morale + rating)" />
-          <Row label="Veteran paycut offer" value="15% (accept ≈ 30 + morale·0.5%)" />
-          <Row label="Exempt clubs" value={[...CONTRACT_EXEMPT_TEAMS].join(", ")} />
+          <NumberSetting
+            label="Demand modifier — min" value={s.demandModifierMin} step={0.05} min={0.1} max={s.demandModifierMax}
+            onCommit={(v) => setSettings({ demandModifierMin: v })}
+          />
+          <NumberSetting
+            label="Demand modifier — max" value={s.demandModifierMax} step={0.05} min={s.demandModifierMin} max={5}
+            onCommit={(v) => setSettings({ demandModifierMax: v })}
+          />
+          <NumberSetting
+            label="Veteran paycut (%)" value={Math.round(s.veteranPaycut * 100)} step={1} min={0} max={90}
+            onCommit={(v) => setSettings({ veteranPaycut: Math.max(0, Math.min(0.9, v / 100)) })}
+          />
+          <ExemptSetting
+            teamOrder={teamOrder} selected={s.contractExemptTeams}
+            onChange={(list) => setSettings({ contractExemptTeams: list })}
+          />
         </SettingsCard>
 
         <SettingsCard title="Trade Engine">
-          <Row label="Utility threshold" value={`${UTILITY_THRESHOLD} (combined ΔU to propose)`} />
-          <Row label="Transfer window" value={`Weeks 1–${TRANSFER_WINDOW_LAST_WEEK}`} />
-          <Row label="Cash utility weight" value="0.25× budget ($M)" />
-          <Row label="Bench rating weight" value="0.40×" />
+          <NumberSetting
+            label="Utility threshold" value={s.utilityThreshold} step={0.5} min={0} max={50}
+            onCommit={(v) => setSettings({ utilityThreshold: v })}
+          />
+          <NumberSetting
+            label="Transfer window — last week" value={s.transferWindowLastWeek} step={1} min={1} max={52}
+            onCommit={(v) => setSettings({ transferWindowLastWeek: Math.round(v) })}
+          />
+          <NumberSetting
+            label="Cash utility weight" value={s.cashUtilityWeight} step={0.05} min={0} max={2}
+            onCommit={(v) => setSettings({ cashUtilityWeight: v })}
+          />
+          <NumberSetting
+            label="Bench rating weight" value={s.benchRatingWeight} step={0.05} min={0} max={2}
+            onCommit={(v) => setSettings({ benchRatingWeight: v })}
+          />
         </SettingsCard>
 
         <SettingsCard title="Morale Engine">
-          <Row label="Baseline" value={String(MORALE_BASELINE)} />
-          <Row label="High / Low bands" value={`${HIGH_MORALE} / ${LOW_MORALE}`} />
-          <Row label="Sack threshold" value={String(SACK_THRESHOLD)} />
-          <Row label="Manager renewal morale" value={String(MANAGER_RENEWAL_MORALE)} />
-          <Row label="Season carry-over reset" value={`±${SEASON_MORALE_RESET} toward ${MORALE_BASELINE}`} />
+          <NumberSetting
+            label="Baseline" value={s.moraleBaseline} step={1} min={0} max={100}
+            onCommit={(v) => setSettings({ moraleBaseline: Math.round(v) })}
+          />
+          <NumberSetting
+            label="High band" value={s.highMorale} step={1} min={0} max={100}
+            onCommit={(v) => setSettings({ highMorale: Math.round(v) })}
+          />
+          <NumberSetting
+            label="Low band" value={s.lowMorale} step={1} min={0} max={100}
+            onCommit={(v) => setSettings({ lowMorale: Math.round(v) })}
+          />
+          <NumberSetting
+            label="Sack threshold" value={s.sackThreshold} step={1} min={0} max={100}
+            onCommit={(v) => setSettings({ sackThreshold: Math.round(v) })}
+          />
+          <NumberSetting
+            label="Manager renewal morale" value={s.managerRenewalMorale} step={1} min={0} max={100}
+            onCommit={(v) => setSettings({ managerRenewalMorale: Math.round(v) })}
+          />
+          <NumberSetting
+            label="Season carry-over reset" value={s.seasonMoraleReset} step={1} min={0} max={50}
+            onCommit={(v) => setSettings({ seasonMoraleReset: Math.round(v) })}
+          />
         </SettingsCard>
 
-        <SettingsCard title="League Structure">
+        <SettingsCard title="League Structure (reference)">
           <Row label="Teams" value="24 · 9v9" />
           <Row label="Default formation" value={DEFAULT_FORMATION} />
           <Row label="Regular season" value="12 weeks" />
@@ -117,6 +207,103 @@ function Row({ label, value, highlight }: { label: string; value: string; highli
     <div className="flex items-center justify-between gap-3 py-1.5 text-sm">
       <span className="text-muted-foreground">{label}</span>
       <span className={`text-right font-medium ${highlight ? "font-mono font-extrabold text-primary" : ""}`}>{value}</span>
+    </div>
+  );
+}
+
+// Numeric setting with a local draft committed on blur/Enter.
+function NumberSetting({
+  label, value, step, min, max, onCommit,
+}: {
+  label: string; value: number; step?: number; min?: number; max?: number;
+  onCommit: (v: number) => void;
+}) {
+  const [draft, setDraft] = useState<string>(String(value));
+  const [editing, setEditing] = useState(false);
+
+  // Keep the field in sync when the underlying value changes externally.
+  useEffect(() => { if (!editing) setDraft(String(value)); }, [value, editing]);
+
+  function commit() {
+    setEditing(false);
+    const v = parseFloat(draft);
+    if (!Number.isNaN(v)) onCommit(v);
+    else setDraft(String(value));
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3 py-1.5 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <Input
+        type="number" step={step} min={min} max={max} value={draft}
+        onFocus={() => setEditing(true)}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        className="h-8 w-24 text-center font-mono"
+      />
+    </div>
+  );
+}
+
+function ToggleSetting({
+  label, checked, onChange,
+}: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <Switch checked={checked} onCheckedChange={onChange} />
+    </div>
+  );
+}
+
+function SelectSetting({
+  label, value, options, onChange,
+}: {
+  label: string; value: string;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-1.5 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="h-8 w-40"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+// Multi-select for contract-exempt clubs.
+function ExemptSetting({
+  teamOrder, selected, onChange,
+}: { teamOrder: string[]; selected: string[]; onChange: (list: string[]) => void }) {
+  function toggle(name: string) {
+    onChange(selected.includes(name) ? selected.filter((n) => n !== name) : [...selected, name]);
+  }
+  return (
+    <div className="py-2 text-sm">
+      <div className="mb-1.5 text-muted-foreground">Exempt clubs (auto contract engine skips these)</div>
+      <div className="flex flex-wrap gap-1.5">
+        {teamOrder.map((name) => {
+          const on = selected.includes(name);
+          return (
+            <button
+              key={name} type="button" onClick={() => toggle(name)}
+              className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                on
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background text-muted-foreground hover:border-primary/50"
+              }`}
+            >
+              {name}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
