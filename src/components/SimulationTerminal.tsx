@@ -68,7 +68,7 @@ export function SimulationTerminal({
     setRunning(true);
     setScore(null);
     setLines([]);
-    const result = simulateMatch(state, home, away, TEMPO_MAP[tempoIdx], goalMult);
+    const result = simulateMatch(state, home, away, TEMPO_MAP[tempoIdx], goalMult, playoff);
     const fullLog = result.log;
     let i = 0;
     timerRef.current = window.setInterval(() => {
