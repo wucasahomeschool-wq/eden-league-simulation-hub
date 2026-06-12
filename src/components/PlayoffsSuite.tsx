@@ -177,6 +177,13 @@ export function PlayoffsSuite() {
           setManualMatch(null);
         }}
       />
+
+      <MatchCommentaryDialog
+        open={!!commentaryMatch}
+        onClose={() => setCommentaryMatch(null)}
+        title={commentaryMatch ? `${commentaryMatch.home} vs ${commentaryMatch.away}` : ""}
+        log={commentaryMatch ? state.payloads[commentaryMatch.id]?.log : undefined}
+      />
     </div>
   );
 }
