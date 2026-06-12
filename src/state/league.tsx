@@ -360,10 +360,12 @@ function loadState(): LeagueState {
   if (typeof window === "undefined") return initState();
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw) return normalize(JSON.parse(raw) as LeagueState);
+    // Force the undo/redo history empty on load — it is session-only and must
+    // match the server-rendered (empty) state to avoid a hydration mismatch.
+    if (raw) return normalize({ ...(JSON.parse(raw) as LeagueState), undoStack: [], redoStack: [] });
     for (const key of LEGACY_STORAGE_KEYS) {
       const legacy = window.localStorage.getItem(key);
-      if (legacy) return normalize(JSON.parse(legacy) as LeagueState);
+      if (legacy) return normalize({ ...(JSON.parse(legacy) as LeagueState), undoStack: [], redoStack: [] });
     }
   } catch {
     /* ignore corrupt state */
