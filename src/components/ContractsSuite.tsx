@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLeague } from "@/state/league";
 import { CONTRACT_EXEMPT_TEAMS, type ContractAction } from "@/lib/contracts";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
