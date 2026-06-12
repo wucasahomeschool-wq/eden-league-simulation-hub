@@ -715,6 +715,7 @@ interface LeagueContextValue {
   setSettings: (patch: Partial<EngineSettings>) => void;
   revertToVersion: (data: VersionData) => void;
   updateBudget: (team: string, budget: string) => void;
+  setTacticalStyle: (team: string, style: string) => void;
   updatePlayer: (team: string, index: number, patch: Partial<LeaguePlayer>) => void;
   setLineupSlot: (team: string, slot: number, playerName: string) => void;
   setFormation: (team: string, formation: string) => void;
