@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLeague, simulateMatch } from "@/state/league";
+import { settings } from "@/lib/engine-settings";
 import { validateMatchup } from "@/lib/lineup";
 import type { MatchPayload } from "@/lib/match-payload";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { Slider } from "@/components/ui/slider";
 
 const TEMPO_MAP = [1.0, 1.2, 1.4];
 const TEMPO_LABEL = ["Slow", "Normal", "Fast"];
+const defaultTempoIdx = () => Math.max(0, TEMPO_MAP.indexOf(settings.defaultTempo));
 
 interface Props {
   initialHome?: string;
