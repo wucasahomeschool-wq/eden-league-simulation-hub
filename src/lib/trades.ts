@@ -279,3 +279,54 @@ export function generateTradeProposals(state: LeagueState): TradeProposal[] {
     .filter((d) => d.deltaUA + d.deltaUB >= UTILITY_THRESHOLD)
     .slice(0, MAX_SURFACED);
 }
+
+// ---------------- 5. Pre-flight validation (shared by manual + accept) ----------------
+// Returns a human-readable reason why a trade cannot go through, or null when
+// the deal is legal. Mirrors the exact guards inside the state engine so the
+// UI can explain a rejection instead of failing silently.
+export function tradeBlockReason(
+  state: LeagueState,
+  aName: string,
+  bName: string,
+  aPlayers: string[],
+  bPlayers: string[],
+  cashAReceives: number, // $M paid by B to A
+  cashBReceives: number  // $M paid by A to B
+): string | null {
+  if (aName === bName) return "Pick two different clubs.";
+  const teamA = state.teams[aName];
+  const teamB = state.teams[bName];
+  if (!teamA || !teamB) return "Unknown club selected.";
+
+  // ---- Affordability: a club cannot spend cash it doesn't have ----
+  const aBudget = parseBudget(teamA.budget);
+  const bBudget = parseBudget(teamB.budget);
+  const aAfter = aBudget + cashAReceives - cashBReceives;
+  const bAfter = bBudget + cashBReceives - cashAReceives;
+  if (bAfter < -0.001) {
+    return `${bName} doesn't have the capital for this deal — it holds ${formatBudget(bBudget)} but would need to pay ${formatBudget(cashAReceives)}.`;
+  }
+  if (aAfter < -0.001) {
+    return `${aName} doesn't have the capital for this deal — it holds ${formatBudget(aBudget)} but would need to pay ${formatBudget(cashBReceives)}.`;
+  }
+
+  // ---- Cap Lock: salaries travel with players ----
+  const cap = state.salaryCap ?? Infinity;
+  const aSet = new Set(aPlayers.filter(Boolean));
+  const bSet = new Set(bPlayers.filter(Boolean));
+  const salarySum = (ps: LeaguePlayer[]) => ps.reduce((s, p) => s + (p.salary ?? 0), 0);
+  const outA = teamA.players.filter((p) => aSet.has(p.name));
+  const outB = teamB.players.filter((p) => bSet.has(p.name));
+  const curA = salarySum(teamA.players);
+  const curB = salarySum(teamB.players);
+  const payA = curA - salarySum(outA) + salarySum(outB);
+  const payB = curB - salarySum(outB) + salarySum(outA);
+  if (payA > cap + 0.001 && payA > curA + 0.001) {
+    return `Blocked by the $${cap}M hard salary cap: ${aName}'s payroll would rise from $${round1(curA)}M to $${round1(payA)}M.`;
+  }
+  if (payB > cap + 0.001 && payB > curB + 0.001) {
+    return `Blocked by the $${cap}M hard salary cap: ${bName}'s payroll would rise from $${round1(curB)}M to $${round1(payB)}M.`;
+  }
+
+  return null;
+}

@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import {
   useLeague, TRANSFER_WINDOW_LAST_WEEK, type LeagueTeam,
 } from "@/state/league";
-import { calculatePlayerValue, type TradeProposal } from "@/lib/trades";
+import { calculatePlayerValue, tradeBlockReason, type TradeProposal } from "@/lib/trades";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,6 +15,29 @@ const NONE = "__none__";
 export function TradesSuite() {
   const { state, executeTrade, executeManualTrade, declineTrade, refreshTradeProposals } = useLeague();
   const inWindow = state.currentWeek <= TRANSFER_WINDOW_LAST_WEEK;
+
+  function acceptProposal(t: TradeProposal) {
+    const reason = tradeBlockReason(state, t.teamA, t.teamB, [t.aSends], [t.bSends], t.cashAReceives, t.cashBReceives);
+    if (reason) {
+      toast.error("Trade blocked", { description: reason });
+      return;
+    }
+    executeTrade(t);
+    toast.success("Trade completed", { description: `${t.teamA} ↔ ${t.teamB}` });
+  }
+
+  function submitManualTrade(
+    teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashA: number, cashB: number,
+  ): boolean {
+    const reason = tradeBlockReason(state, teamA, teamB, aPlayers, bPlayers, cashA, cashB);
+    if (reason) {
+      toast.error("Trade blocked", { description: reason });
+      return false;
+    }
+    executeManualTrade(teamA, teamB, aPlayers, bPlayers, cashA, cashB);
+    toast.success("Trade completed", { description: `${teamA} ↔ ${teamB}` });
+    return true;
+  }
 
   return (
     <div className="space-y-8">
