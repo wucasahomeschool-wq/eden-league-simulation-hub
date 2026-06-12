@@ -156,6 +156,11 @@ interface MatchEnvironment {
 }
 
 function makeEnvironment(): MatchEnvironment {
+  // Weather effects can be toggled off in Settings: every match then plays in
+  // neutral Clear/Sunny conditions (no pass/fatigue/injury modifiers).
+  if (!settings.weatherEffects) {
+    return { weather_name: "Clear/Sunny", pass_mod: 1.0, fatigue_mod: 1.0, injury_mod: 1.0, ref_strictness: randint(1, 10) };
+  }
   const conditions: [string, number, number, number][] = [
     ["Clear/Sunny", 1.0, 1.0, 1.0],
     ["Heavy Rain", 0.9, 1.15, 1.15],
