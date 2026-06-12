@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import {
-  useLeague, type LeagueTeam,
+  useLeague, TRANSFER_WINDOW_LAST_WEEK, type LeagueTeam,
 } from "@/state/league";
 import { calculatePlayerValue, tradeBlockReason, type TradeProposal } from "@/lib/trades";
 import { toast } from "sonner";
