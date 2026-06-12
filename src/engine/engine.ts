@@ -9,6 +9,8 @@
 // by the UI bridge. DO NOT alter any formula.
 // =============================================================================
 
+import { settings } from "@/lib/engine-settings";
+
 export const GOAL_MULTIPLIER_DEFAULT = 0.6;
 export const IDENTITY_BOOST_WEIGHT = 0.6;
 
