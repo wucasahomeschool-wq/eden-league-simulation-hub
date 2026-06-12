@@ -19,6 +19,7 @@ interface Props {
   onComplete?: (homeGoals: number, awayGoals: number, payload: MatchPayload) => void;
   fullscreen?: boolean;
   onExit?: () => void;
+  playoff?: boolean;
 }
 
 export function SimulationTerminal({
@@ -29,6 +30,7 @@ export function SimulationTerminal({
   onComplete,
   fullscreen = false,
   onExit,
+  playoff = false,
 }: Props) {
   const { state, addYouthPlayer } = useLeague();
   const teams = state.teamOrder;
@@ -66,7 +68,7 @@ export function SimulationTerminal({
     setRunning(true);
     setScore(null);
     setLines([]);
-    const result = simulateMatch(state, home, away, TEMPO_MAP[tempoIdx], goalMult);
+    const result = simulateMatch(state, home, away, TEMPO_MAP[tempoIdx], goalMult, playoff);
     const fullLog = result.log;
     let i = 0;
     timerRef.current = window.setInterval(() => {

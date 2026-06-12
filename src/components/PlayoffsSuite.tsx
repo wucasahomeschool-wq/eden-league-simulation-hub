@@ -149,6 +149,7 @@ export function PlayoffsSuite() {
           lockTeams
           defaultTempoIndex={1}
           fullscreen
+          playoff
           onComplete={(h, a, payload) => { setPlayoffResult(simMatch.id, h, a, "SIM", payload); setSimMatch(null); }}
           onExit={() => setSimMatch(null)}
         />
