@@ -712,6 +712,7 @@ interface LeagueContextValue {
   canUndo: boolean;
   canRedo: boolean;
   setSalaryCap: (cap: number) => void;
+  setSettings: (patch: Partial<EngineSettings>) => void;
   revertToVersion: (data: VersionData) => void;
   updateBudget: (team: string, budget: string) => void;
   updatePlayer: (team: string, index: number, patch: Partial<LeaguePlayer>) => void;
