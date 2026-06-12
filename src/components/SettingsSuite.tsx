@@ -101,6 +101,11 @@ function LeagueSettings({
             label="Playoff penalties (draw → shootout)" checked={s.playoffPenalties}
             onChange={(v) => setSettings({ playoffPenalties: v })}
           />
+          <ExemptSetting
+            label="Manual-only clubs (games entered by hand, never simulated)"
+            teamOrder={teamOrder} selected={s.manualSimTeams}
+            onChange={(list) => setSettings({ manualSimTeams: list })}
+          />
         </SettingsCard>
 
         <SettingsCard title="Contract Engine">
