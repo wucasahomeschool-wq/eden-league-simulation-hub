@@ -93,7 +93,7 @@ export function applyPlayerEvent(
   player: LeaguePlayer,
   event: PlayerEvent
 ): void {
-  if (EXEMPT_TEAMS.has(team.name)) return;
+  if (isManualSimTeam(team.name)) return;
   player.morale = clampMorale((player.morale ?? settings.moraleBaseline) + PLAYER_EVENTS[event]);
 }
 
