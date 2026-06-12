@@ -178,7 +178,7 @@ export function runContractCycle(state: LeagueState): {
 
   // 2. Front-office decisions (non-exempt clubs only).
   for (const name of state.teamOrder) {
-    if (CONTRACT_EXEMPT_TEAMS.has(name)) continue;
+    if (isContractExempt(name)) continue;
     const { players, freed, actions: a } = evaluateClubContracts(teams[name], salaryCap);
     teams[name] = { ...teams[name], players };
     freeAgents.push(...freed);
