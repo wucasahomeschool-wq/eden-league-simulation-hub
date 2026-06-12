@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import {
-  useLeague, TRANSFER_WINDOW_LAST_WEEK, type LeagueTeam,
+  useLeague, type LeagueTeam,
 } from "@/state/league";
 import { calculatePlayerValue, tradeBlockReason, type TradeProposal } from "@/lib/trades";
 import { toast } from "sonner";
@@ -14,7 +14,8 @@ const NONE = "__none__";
 
 export function TradesSuite() {
   const { state, executeTrade, executeManualTrade, declineTrade, refreshTradeProposals } = useLeague();
-  const inWindow = state.currentWeek <= TRANSFER_WINDOW_LAST_WEEK;
+  const lastWindowWeek = state.settings?.transferWindowLastWeek ?? TRANSFER_WINDOW_LAST_WEEK;
+  const inWindow = state.currentWeek <= lastWindowWeek;
 
   function acceptProposal(t: TradeProposal) {
     const reason = tradeBlockReason(state, t.teamA, t.teamB, [t.aSends], [t.bSends], t.cashAReceives, t.cashBReceives);
@@ -49,7 +50,7 @@ export function TradesSuite() {
             <p className="text-xs text-muted-foreground">
               The market engine scans all 24 clubs each match week and surfaces every deal whose
               combined utility clears the quality threshold — not a fixed count.{" "}
-              {inWindow ? "Transfer window OPEN." : `Window closed (reopens next season, runs through Week ${TRANSFER_WINDOW_LAST_WEEK}).`}
+              {inWindow ? "Transfer window OPEN." : `Window closed (reopens next season, runs through Week ${lastWindowWeek}).`}
             </p>
           </div>
           <Button size="sm" variant="outline" onClick={refreshTradeProposals}>
