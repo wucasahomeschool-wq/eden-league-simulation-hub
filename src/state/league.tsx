@@ -11,7 +11,7 @@ import { buildMatchPayload, type MatchPayload } from "@/lib/match-payload";
 import type { VersionData } from "@/lib/league-export";
 import {
   applyTeamEvent, applyPlayerEvent, moraleScaledAttrs, MORALE_BASELINE,
-  EXEMPT_TEAMS, clampMorale, carryOverMorale,
+  clampMorale, carryOverMorale,
 } from "@/lib/morale";
 import {
   generateTradeProposals, parseBudget, formatBudget, type TradeProposal,
