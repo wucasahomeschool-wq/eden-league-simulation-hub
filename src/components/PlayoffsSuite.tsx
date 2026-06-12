@@ -135,6 +135,18 @@ export function PlayoffsSuite() {
                           Tie — re-enter a result with a winner to advance
                         </p>
                       )}
+                      {m.result?.method === "SIM" && (
+                        <div className="mt-1 flex justify-center">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2 text-[11px] font-semibold text-primary"
+                            onClick={() => setCommentaryMatch(m)}
+                          >
+                            VIEW MATCH COMMENTARY
+                          </Button>
+                        </div>
+                      )}
                     </li>
                   );
                 })}
