@@ -30,6 +30,13 @@ const NUM_COLS: { key: AttrKey; label: string }[] = [
   { key: "AER", label: "AER" },
 ];
 
+// Base tactical identities the simulation engine scores against.
+const TACTICAL_STYLES = [
+  "Balanced", "Possession", "Counterattack", "Deep Block", "Chaos Attack", "High Press",
+] as const;
+
+
+
 
 function weeksLabel(weeks: number): string {
   if (weeks >= SEASON_ENDING_WEEKS) return "Season";
@@ -40,7 +47,7 @@ export function TeamEditorSuite() {
   const {
     state, updateBudget, updatePlayer,
     setInjuryWeeks, setSuspensionWeeks, addPlayer, removePlayer, renameTeam,
-    setLineupSlot, setFormation, autoFillLineup,
+    setLineupSlot, setFormation, autoFillLineup, setTacticalStyle,
     setSalary, setContractYears,
   } = useLeague();
   const [team, setTeam] = useState(state.teamOrder[0]);
@@ -122,8 +129,19 @@ export function TeamEditorSuite() {
             className="h-9 w-40 rounded-md border bg-card px-3 font-mono text-sm font-semibold"
           />
         </div>
+        <div>
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Preferred Tactical Style
+          </label>
+          <Select value={t.tactical_style} onValueChange={(v) => setTacticalStyle(team, v)}>
+            <SelectTrigger className="h-9 w-48 bg-card"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {TACTICAL_STYLES.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
         <div className="ml-auto text-right text-xs text-muted-foreground">
-          <div>Tactical style: <span className="font-semibold text-foreground">{t.tactical_style}</span></div>
+
           <div>Team Morale: <span className={`font-semibold ${moraleTone}`}>{t.morale.toFixed(0)}% · {ml.text}</span></div>
           <div>Active starters: <span className={starterCount === slots.length ? "font-semibold text-success" : "font-semibold text-destructive"}>{starterCount}/{slots.length}</span></div>
           <div>Payroll: <span className={`font-semibold ${payroll > (state.salaryCap ?? Infinity) + 0.001 ? "text-destructive" : "text-foreground"}`}>${payroll.toFixed(1)}M / ${(state.salaryCap ?? 0).toFixed(1)}M cap</span></div>

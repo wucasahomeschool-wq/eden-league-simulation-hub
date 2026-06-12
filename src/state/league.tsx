@@ -715,6 +715,7 @@ interface LeagueContextValue {
   setSettings: (patch: Partial<EngineSettings>) => void;
   revertToVersion: (data: VersionData) => void;
   updateBudget: (team: string, budget: string) => void;
+  setTacticalStyle: (team: string, style: string) => void;
   updatePlayer: (team: string, index: number, patch: Partial<LeaguePlayer>) => void;
   setLineupSlot: (team: string, slot: number, playerName: string) => void;
   setFormation: (team: string, formation: string) => void;
@@ -1090,6 +1091,11 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       update((prev) => ({
         ...prev,
         teams: { ...prev.teams, [team]: { ...prev.teams[team], budget } },
+      })),
+    setTacticalStyle: (team, style) =>
+      update((prev) => ({
+        ...prev,
+        teams: { ...prev.teams, [team]: { ...prev.teams[team], tactical_style: style } },
       })),
     updatePlayer: (team, index, patch) =>
       update((prev) => {
