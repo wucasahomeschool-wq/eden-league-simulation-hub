@@ -9,8 +9,8 @@
 // by the UI bridge. DO NOT alter any formula.
 // =============================================================================
 
-const GOAL_MULTIPLIER_DEFAULT = 0.6;
-const IDENTITY_BOOST_WEIGHT = 0.6;
+export const GOAL_MULTIPLIER_DEFAULT = 0.6;
+export const IDENTITY_BOOST_WEIGHT = 0.6;
 
 // ---- RNG helpers mirroring Python's `random` module semantics ----
 function uniform(a: number, b: number): number {
