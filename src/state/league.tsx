@@ -1350,6 +1350,15 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       }));
       return r.actions;
     },
+    setSalaryCap: (cap) =>
+      update((prev) => {
+        const next = Math.max(0, Math.round(cap * 10) / 10);
+        const teams: Record<string, LeagueTeam> = {};
+        for (const name of prev.teamOrder) {
+          teams[name] = { ...prev.teams[name], salaryBudget: next };
+        }
+        return { ...prev, salaryCap: next, teams };
+      }),
     resetLeague: () => setState(initState()),
   };
 
