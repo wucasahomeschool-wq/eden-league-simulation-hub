@@ -15,14 +15,22 @@ const ACTION_TONE: Record<ContractAction["type"], string> = {
 };
 
 export function ContractsSuite() {
-  const { state, runContractCycle, signFreeAgent } = useLeague();
+  const { state, runContractCycle, signFreeAgent, setSalaryCap } = useLeague();
   const [log, setLog] = useState<ContractAction[]>([]);
   const [ran, setRan] = useState(false);
   const [signTo, setSignTo] = useState(state.teamOrder[0]);
+  const [capDraft, setCapDraft] = useState("");
 
   const cap = state.salaryCap ?? 0;
   const seasonOver = !!state.playoffs?.champion;
   const freeAgents = state.freeAgents ?? [];
+
+  function commitCap() {
+    const v = parseFloat(capDraft);
+    if (!Number.isNaN(v) && v > 0) setSalaryCap(v);
+    setCapDraft("");
+  }
+
 
   function handleRun() {
     const actions = runContractCycle();
