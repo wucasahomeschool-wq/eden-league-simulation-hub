@@ -1011,6 +1011,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     standings,
     leaderboards,
     canUndo: state.undoStack.length > 0,
+    canRedo: state.redoStack.length > 0,
     setResult: (fixtureId, homeGoals, awayGoals, method, payload) =>
       update((prev) => {
         const fixture = prev.fixtures.find((f) => f.id === fixtureId);
@@ -1036,7 +1037,29 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         const last = stack.pop()!;
         try {
           const restored = JSON.parse(last) as LeagueState;
-          return normalize({ ...restored, undoStack: stack });
+          const redoSnap = JSON.stringify({ ...prev, undoStack: [], redoStack: [] });
+          return normalize({
+            ...restored,
+            undoStack: stack,
+            redoStack: [...prev.redoStack, redoSnap].slice(-MAX_UNDO),
+          });
+        } catch {
+          return prev;
+        }
+      }),
+    redo: () =>
+      setState((prev) => {
+        if (!prev.redoStack.length) return prev;
+        const stack = [...prev.redoStack];
+        const last = stack.pop()!;
+        try {
+          const restored = JSON.parse(last) as LeagueState;
+          const undoSnap = JSON.stringify({ ...prev, undoStack: [], redoStack: [] });
+          return normalize({
+            ...restored,
+            redoStack: stack,
+            undoStack: [...prev.undoStack, undoSnap].slice(-MAX_UNDO),
+          });
         } catch {
           return prev;
         }
