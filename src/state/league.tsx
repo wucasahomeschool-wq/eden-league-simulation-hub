@@ -338,6 +338,9 @@ function normalize(state: LeagueState): LeagueState {
     salaryCap = init.salaryCap;
     contractsInitialized = true;
   }
+  // Merge persisted tuning knobs into the live engine singleton so every
+  // engine immediately reads the current values (any load path hits normalize).
+  const mergedSettings = applySettings(state.settings);
   return {
     ...state,
     season: state.season ?? 1,
@@ -349,6 +352,7 @@ function normalize(state: LeagueState): LeagueState {
     salaryCap,
     freeAgents: state.freeAgents ?? [],
     contractsInitialized,
+    settings: { ...mergedSettings, contractExemptTeams: [...mergedSettings.contractExemptTeams] },
   };
 }
 
