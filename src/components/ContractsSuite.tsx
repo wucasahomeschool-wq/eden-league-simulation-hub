@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLeague } from "@/state/league";
-import { CONTRACT_EXEMPT_TEAMS, type ContractAction } from "@/lib/contracts";
+import { type ContractAction } from "@/lib/contracts";
+import { isContractExempt } from "@/lib/engine-settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -106,7 +107,7 @@ export function ContractsSuite() {
                   <tr key={name} className="border-b last:border-0">
                     <td className="px-3 py-1.5 font-medium">
                       {name}
-                      {CONTRACT_EXEMPT_TEAMS.has(name) && (
+                      {isContractExempt(name) && (
                         <span className="ml-1 rounded bg-amber-200 px-1 text-[9px] font-bold uppercase text-amber-900">manual</span>
                       )}
                     </td>
