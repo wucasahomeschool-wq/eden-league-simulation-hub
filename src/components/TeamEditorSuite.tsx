@@ -40,7 +40,7 @@ export function TeamEditorSuite() {
   const {
     state, updateBudget, updatePlayer,
     setInjuryWeeks, setSuspensionWeeks, addPlayer, removePlayer, renameTeam,
-    setLineupSlot, setFormation, autoFillLineup,
+    setLineupSlot, setFormation, autoFillLineup, setTacticalStyle,
     setSalary, setContractYears,
   } = useLeague();
   const [team, setTeam] = useState(state.teamOrder[0]);
