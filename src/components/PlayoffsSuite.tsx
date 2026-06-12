@@ -4,6 +4,7 @@ import {
   PLAYOFF_ROUND_NAMES, type PlayoffMatch,
 } from "@/state/league";
 import { SimulationTerminal } from "@/components/SimulationTerminal";
+import { MatchCommentaryDialog } from "@/components/MatchCommentaryDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -14,6 +15,7 @@ export function PlayoffsSuite() {
   const { state, generatePlayoffs, setPlayoffResult } = useLeague();
   const [simMatch, setSimMatch] = useState<PlayoffMatch | null>(null);
   const [manualMatch, setManualMatch] = useState<PlayoffMatch | null>(null);
+  const [commentaryMatch, setCommentaryMatch] = useState<PlayoffMatch | null>(null);
 
   const week16Done = isWeekComplete(state, 16);
   const playoffs = state.playoffs;
