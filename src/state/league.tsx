@@ -985,7 +985,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     for (const name of next.teamOrder) {
       const t = next.teams[name];
       const inLineup = new Set(t.lineup.filter(Boolean));
-      const exempt = EXEMPT_TEAMS.has(name);
+      const exempt = isManualSimTeam(name);
       const players = t.players.map((p) => {
         let np = p;
         if (!protectedKeys.has(`${name}::${p.name}`) && (p.injuryWeeks > 0 || p.suspensionWeeks > 0)) {
