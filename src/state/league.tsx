@@ -11,8 +11,9 @@ import { buildMatchPayload, type MatchPayload } from "@/lib/match-payload";
 import type { VersionData } from "@/lib/league-export";
 import {
   applyTeamEvent, applyPlayerEvent, moraleScaledAttrs, MORALE_BASELINE,
-  clampMorale, carryOverMorale,
+  clampMorale, carryOverMorale, drainSackedTeams,
 } from "@/lib/morale";
+import { buildManagers, type ManagerRecord } from "@/data/managers";
 import {
   generateTradeProposals, parseBudget, formatBudget, type TradeProposal,
 } from "@/lib/trades";
