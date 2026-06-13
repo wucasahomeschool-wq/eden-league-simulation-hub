@@ -63,7 +63,7 @@ export function NewsSuite() {
 
     setLoading(true);
     try {
-      const res = await run({ data: { kind: tab, brief } });
+      const res = await run({ data: { kind: tab, brief, focus: focus.trim() || undefined } });
       setArticle(res.article);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
