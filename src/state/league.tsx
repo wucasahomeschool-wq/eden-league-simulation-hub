@@ -880,6 +880,7 @@ function autoPromote(team: LeagueTeam, incoming: LeaguePlayer[]): LeagueTeam {
   const slots = buildLineupSlots(team.formation);
   const lineup = [...team.lineup];
   for (const inc of incoming) {
+    if (isPlayerOut(inc)) continue; // injured/suspended arrivals start on the bench
     if (lineup.includes(inc.name)) continue; // already starting
     const targetGroup: LineupSlot["group"] = positionGroup(inc.position) === "GK" ? "GK" : "OUT";
     let worstIdx = -1;
@@ -893,6 +894,38 @@ function autoPromote(team: LeagueTeam, incoming: LeaguePlayer[]): LeagueTeam {
     if (worstIdx >= 0 && inc.rating > worstRating) lineup[worstIdx] = inc.name;
   }
   return { ...team, lineup };
+}
+
+// Repair a lineup so it never references a missing player or leaves a hole. First
+// drops "ghost" names no longer on the roster (released / removed / traded-away),
+// then backfills every empty starting slot with the best available healthy
+// reserve so a club is never left a man short. GK slots prefer a goalkeeper;
+// outfield slots take the highest-rated healthy bench player. Re-syncs starter
+// flags before returning.
+function repairLineup(team: LeagueTeam): LeagueTeam {
+  const slots = buildLineupSlots(team.formation);
+  const roster = new Set(team.players.map((p) => p.name));
+  // Align length to the formation and strip references to absent players.
+  const lineup = slots.map((_, i) => {
+    const n = team.lineup[i] ?? "";
+    return n && roster.has(n) ? n : "";
+  });
+  if (lineup.includes("")) {
+    const used = new Set(lineup.filter(Boolean));
+    const ranked = [...team.players].sort((a, b) => b.rating - a.rating);
+    slots.forEach((slot, i) => {
+      if (lineup[i]) return;
+      let pick: LeaguePlayer | undefined;
+      if (slot.group === "GK") {
+        pick = ranked.find(
+          (p) => !used.has(p.name) && !isPlayerOut(p) && positionGroup(p.position) === "GK"
+        );
+      }
+      if (!pick) pick = ranked.find((p) => !used.has(p.name) && !isPlayerOut(p));
+      if (pick) { used.add(pick.name); lineup[i] = pick.name; }
+    });
+  }
+  return syncStarters({ ...team, lineup });
 }
 
 // Drain any manager sacks recorded during the just-applied morale events and
@@ -955,9 +988,10 @@ function moveTrade(
     players: teamB.players.filter((p) => !bSet.has(p.name)).concat(movingFromA),
   };
 
-  // Auto-promote upgrades into the lineup.
-  aTeam = autoPromote(aTeam, movingFromB);
-  bTeam = autoPromote(bTeam, movingFromA);
+  // Auto-promote upgrades into the lineup, then backfill any slots left empty by
+  // departing starters with the best healthy reserve (never field a man short).
+  aTeam = repairLineup(autoPromote(aTeam, movingFromB));
+  bTeam = repairLineup(autoPromote(bTeam, movingFromA));
 
   // Team morale: market triumph for both; asset depletion when sending without
   // receiving a player back.
@@ -1370,10 +1404,9 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     removePlayer: (team, index) =>
       update((prev) => {
         const t = prev.teams[team];
-        const removed = t.players[index]?.name;
         const players = t.players.filter((_, i) => i !== index);
-        const lineup = t.lineup.map((n) => (n === removed ? "" : n));
-        return { ...prev, teams: { ...prev.teams, [team]: syncStarters({ ...t, players, lineup }) } };
+        // repairLineup drops the removed player and backfills their slot from the bench.
+        return { ...prev, teams: { ...prev.teams, [team]: repairLineup({ ...t, players }) } };
       }),
     renameTeam: (oldName, newName) =>
       update((prev) => {
@@ -1579,9 +1612,15 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       update((prev) => {
         const r = runCycle(prev);
         actions = r.actions;
+        // Released players must not linger as ghost names in any lineup — repair
+        // every squad so freed starters are dropped and their slots refilled.
+        const teams: Record<string, LeagueTeam> = {};
+        for (const name of prev.teamOrder) {
+          teams[name] = r.teams[name] ? repairLineup(r.teams[name]) : r.teams[name];
+        }
         return {
           ...prev,
-          teams: r.teams,
+          teams,
           freeAgents: r.freeAgents,
           salaryCap: r.salaryCap,
         };
