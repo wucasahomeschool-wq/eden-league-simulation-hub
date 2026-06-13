@@ -339,6 +339,28 @@ export function tradeBlockReason(
   const salarySum = (ps: LeaguePlayer[]) => ps.reduce((s, p) => s + (p.salary ?? 0), 0);
   const outA = teamA.players.filter((p) => aSet.has(p.name));
   const outB = teamB.players.filter((p) => bSet.has(p.name));
+
+  // ---- Player-list integrity ----
+  // A player can't be on both sides, and every named player must actually exist
+  // on the club sending them (a typo'd name would silently become a cash deal).
+  for (const n of aSet) {
+    if (bSet.has(n)) return `${n} can't be on both sides of the trade.`;
+  }
+  if (outA.length < aSet.size) return `One or more selected players are not on ${aName}'s roster.`;
+  if (outB.length < bSet.size) return `One or more selected players are not on ${bName}'s roster.`;
+
+  // ---- Fieldability: neither club may drop below 9 healthy players ----
+  // (the simulation engine cannot field a legal lineup under 9 available players).
+  const healthyCount = (players: LeaguePlayer[], out: Set<string>, incoming: LeaguePlayer[]) =>
+    players.filter((p) => !out.has(p.name) && p.injuryWeeks === 0 && p.suspensionWeeks === 0).length +
+    incoming.filter((p) => p.injuryWeeks === 0 && p.suspensionWeeks === 0).length;
+  if (healthyCount(teamA.players, aSet, outB) < 9) {
+    return `${aName} would be left with fewer than 9 available players and couldn't field a team.`;
+  }
+  if (healthyCount(teamB.players, bSet, outA) < 9) {
+    return `${bName} would be left with fewer than 9 available players and couldn't field a team.`;
+  }
+
   const curA = salarySum(teamA.players);
   const curB = salarySum(teamB.players);
   const payA = curA - salarySum(outA) + salarySum(outB);

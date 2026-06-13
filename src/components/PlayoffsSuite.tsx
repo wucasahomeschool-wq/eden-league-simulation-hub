@@ -79,10 +79,11 @@ export function PlayoffsSuite() {
 
       <div className="space-y-6">
         {playoffs.rounds.map((round, idx) => {
-          const roundNum = round[0].round;
+          const roundNum = round[0]?.round ?? idx + 1;
           const isActive = idx === activeRoundIdx;
           return (
             <section key={roundNum} className="rounded-xl border bg-card">
+
               <header className="flex items-center justify-between border-b px-4 py-2.5">
                 <h3 className="text-sm font-bold uppercase tracking-wide">
                   {PLAYOFF_ROUND_NAMES[roundNum]}

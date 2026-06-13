@@ -11,7 +11,7 @@ function ratingOf(state: LeagueState, team: string, name: string): string {
 
 function describePlayers(state: LeagueState, payload: MatchPayload): string {
   const lines: string[] = [];
-  for (const p of payload.players) {
+  for (const p of payload.players ?? []) {
     const bits: string[] = [];
     if (p.goals > 0) bits.push(`${p.goals} goal${p.goals > 1 ? "s" : ""}`);
     if (p.assists > 0) bits.push(`${p.assists} assist${p.assists > 1 ? "s" : ""}`);
@@ -36,15 +36,15 @@ export function buildPostgameBrief(state: LeagueState, fixtureId: string): strin
   const homeStyle = state.teams[payload.home]?.tactical_style ?? "?";
   const awayStyle = state.teams[payload.away]?.tactical_style ?? "?";
 
-  const gkLines = payload.goalkeepers
+  const gkLines = (payload.goalkeepers ?? [])
     .map(
       (g) =>
         `  - ${g.name} (${g.team}): conceded ${g.conceded}${g.cleanSheet ? ", CLEAN SHEET" : ""}`
     )
     .join("\n");
 
-  const injuries = payload.injuries.length
-    ? payload.injuries.map((i) => `  - ${i.name} (${i.team})`).join("\n")
+  const injuries = (payload.injuries ?? []).length
+    ? (payload.injuries ?? []).map((i) => `  - ${i.name} (${i.team})`).join("\n")
     : "  - None";
 
   return [

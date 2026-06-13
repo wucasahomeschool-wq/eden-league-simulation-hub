@@ -159,7 +159,9 @@ export function runContractCycle(state: LeagueState): {
   salaryCap: number;
   actions: ContractAction[];
 } {
-  const salaryCap = state.salaryCap ?? 0;
+  // Missing cap (corrupt/old state) must NOT read as 0 — that would make every
+  // wage demand exceed the cap and purge whole rosters. Treat absent as unlimited.
+  const salaryCap = state.salaryCap && state.salaryCap > 0 ? state.salaryCap : Infinity;
   const actions: ContractAction[] = [];
   const teams: Record<string, LeagueTeam> = {};
   let freeAgents: LeaguePlayer[] = [...(state.freeAgents ?? [])];

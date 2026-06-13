@@ -396,24 +396,29 @@ export function initState(): LeagueState {
 
 // Ensure migrated/older state has all required fields.
 function normalize(state: LeagueState): LeagueState {
+  // Per-player field backfill, shared by team rosters and the free-agent pool so
+  // an old/partial save can never surface a player missing a required field.
+  const normalizePlayer = (p: LeaguePlayer): LeaguePlayer => {
+    const player: LeaguePlayer = {
+      ...p,
+      injuryWeeks: p.injuryWeeks ?? 0,
+      suspensionWeeks: p.suspensionWeeks ?? 0,
+      reservedSlot: p.reservedSlot ?? null,
+      yellowLog: p.yellowLog ?? [],
+      morale: p.morale ?? MORALE_BASELINE,
+      age: p.age ?? 25,
+      salary: p.salary ?? calculateMarketValue(p.rating ?? 5),
+      contractYears: p.contractYears ?? 0,
+    };
+    // Guard age with > 0 (not truthiness) so a persisted age of 0 isn't re-rolled.
+    const withAge = player.age != null && player.age > 0 ? player : { ...player, age: computeStartingAge(player) };
+    return { ...withAge, rating: computeOverall(withAge) };
+  };
   const teams: Record<string, LeagueTeam> = {};
   for (const name of state.teamOrder) {
     const t = state.teams[name];
-    const players = t.players.map((p) => {
-      const player: LeaguePlayer = {
-        ...p,
-        injuryWeeks: p.injuryWeeks ?? 0,
-        suspensionWeeks: p.suspensionWeeks ?? 0,
-        reservedSlot: p.reservedSlot ?? null,
-        yellowLog: p.yellowLog ?? [],
-        morale: p.morale ?? MORALE_BASELINE,
-        age: p.age ?? 25,
-        salary: p.salary ?? calculateMarketValue(p.rating ?? 5),
-        contractYears: p.contractYears ?? 0,
-      };
-      const withAge = player.age ? player : { ...player, age: computeStartingAge(player) };
-      return { ...withAge, rating: computeOverall(withAge) };
-    });
+    if (!t) continue; // skip a missing/corrupt team entry rather than crashing
+    const players = t.players.map(normalizePlayer);
     const formation = t.formation ?? DEFAULT_FORMATION;
     let lineup = t.lineup;
     if (!lineup || lineup.length === 0) {
@@ -460,7 +465,7 @@ function normalize(state: LeagueState): LeagueState {
     redoStack: state.redoStack ?? [],
     teams: outTeams,
     salaryCap,
-    freeAgents: state.freeAgents ?? [],
+    freeAgents: (state.freeAgents ?? []).map(normalizePlayer),
     contractsInitialized,
     managers,
     settings: { ...mergedSettings, contractExemptTeams: [...mergedSettings.contractExemptTeams] },
@@ -1101,7 +1106,11 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       if (!error && data) {
         versionRef.current = data.version ?? 1;
         applyingRemoteRef.current = true;
-        setState((prev) => normalize({ ...(data.data as unknown as LeagueState), undoStack: prev.undoStack, redoStack: prev.redoStack }));
+        try {
+          setState((prev) => normalize({ ...(data.data as unknown as LeagueState), undoStack: prev.undoStack, redoStack: prev.redoStack }));
+        } catch {
+          applyingRemoteRef.current = false; // corrupt Cloud row — keep local state rather than crash
+        }
       } else {
         // No shared league yet — seed it from whatever this browser currently has.
         setState((prev) => {
@@ -1125,7 +1134,11 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
           if (row.version <= versionRef.current) return; // stale
           versionRef.current = row.version;
           applyingRemoteRef.current = true;
-          setState((prev) => normalize({ ...(row.data as LeagueState), undoStack: prev.undoStack, redoStack: prev.redoStack }));
+          try {
+            setState((prev) => normalize({ ...(row.data as LeagueState), undoStack: prev.undoStack, redoStack: prev.redoStack }));
+          } catch {
+            applyingRemoteRef.current = false; // ignore a corrupt remote payload rather than crash
+          }
         }
       )
       .subscribe();
@@ -1246,6 +1259,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     canRedo: state.redoStack.length > 0,
     setResult: (fixtureId, homeGoals, awayGoals, method, payload) =>
       update((prev) => {
+        if (prev.results[fixtureId]) return prev; // already recorded — never double-apply effects
         const fixture = prev.fixtures.find((f) => f.id === fixtureId);
         const preStandings = computeStandings(prev);
         const { teams, protectedKeys } = applyMatchEffects(
@@ -1528,9 +1542,17 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     setPlayoffResult: (matchId, homeGoals, awayGoals, method, payload) =>
       update((prev) => {
         if (!prev.playoffs) return prev;
+        const matchObj = prev.playoffs.rounds.flat().find((m) => m.id === matchId);
+        if (!matchObj || matchObj.result) return prev; // unknown or already recorded (idempotent)
+        const preStandings = computeStandings(prev);
         const { teams } = applyMatchEffects(
           prev.teams, payload, payload?.injuries, prev.currentWeek
         );
+        // Apply match morale just like the regular season so playoff form counts
+        // (guarded so a bye/placeholder match without two real clubs is skipped).
+        const moraleTeams = prev.teams[matchObj.home] && prev.teams[matchObj.away]
+          ? applyMatchMorale(teams, preStandings, matchObj.home, matchObj.away, homeGoals, awayGoals, payload)
+          : teams;
         const rounds = prev.playoffs.rounds.map((round) =>
           round.map((m) =>
             m.id === matchId ? { ...m, result: { homeGoals, awayGoals, method } } : m
@@ -1538,7 +1560,8 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         );
         return {
           ...prev,
-          teams,
+          teams: moraleTeams,
+          managers: withPendingSacks(prev.managers),
           payloads: payload ? { ...prev.payloads, [matchId]: payload } : prev.payloads,
           playoffs: advancePlayoffs({ ...prev.playoffs, rounds }),
         };
@@ -1592,6 +1615,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         const fa = (prev.freeAgents ?? []).find((p) => p.name === freeAgentName);
         if (!fa) return prev;
         const t = prev.teams[team];
+        if (t.players.some((p) => p.name === freeAgentName)) return prev; // already on this roster — no duplicate
         const signing: LeaguePlayer = {
           ...fa, starter: false,
           salary: calculateMarketValue(fa.rating), contractYears: 1,
@@ -1663,9 +1687,11 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         tradeProposals: data.tradeProposals ?? [],
         freeAgents: data.freeAgents ?? prev.freeAgents,
         // salaryCap intentionally NOT reverted — it is an app setting, not league data.
-        contractsInitialized: data.contractsInitialized ?? prev.contractsInitialized,
+        // Contracts follow the live app (like salaryCap), never the snapshot — a
+        // pre-contracts snapshot must not trigger a salary-resetting re-init.
+        contractsInitialized: prev.contractsInitialized,
       })),
-    resetLeague: () => setState(initState()),
+    resetLeague: () => update(() => initState()), // routed through update() so a full reset is undoable
   };
 
   return <LeagueContext.Provider value={value}>{children}</LeagueContext.Provider>;

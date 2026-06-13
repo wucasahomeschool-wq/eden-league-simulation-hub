@@ -60,26 +60,37 @@ export const generateNews = createServerFn({ method: "POST" })
 
     const system = `${SYSTEM_BY_KIND[data.kind]}\n${SHARED_RULES}`;
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        temperature: 0.9,
-        messages: [
-          { role: "system", content: system },
-          {
-            role: "user",
-            content: data.focus
-              ? `DATA (the only facts you may use):\n\n${data.brief}\n\nEDITOR'S BRIEF — center the article on this angle: "${data.focus}". Use ONLY the facts above to support it; if the data does not back up part of the requested angle, lean on what the data does show rather than inventing anything. Write the article now.`
-              : `DATA (the only facts you may use):\n\n${data.brief}\n\nWrite the article now.`,
-          },
-        ],
-      }),
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30_000);
+    let res: Response;
+    try {
+      res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          temperature: 0.9,
+          messages: [
+            { role: "system", content: system },
+            {
+              role: "user",
+              content: data.focus
+                ? `DATA (the only facts you may use):\n\n${data.brief}\n\nEDITOR'S BRIEF — center the article on this angle: "${data.focus}". Use ONLY the facts above to support it; if the data does not back up part of the requested angle, lean on what the data does show rather than inventing anything. Write the article now.`
+                : `DATA (the only facts you may use):\n\n${data.brief}\n\nWrite the article now.`,
+            },
+          ],
+        }),
+        signal: controller.signal,
+      });
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") throw new Error("AI request timed out");
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
 
     if (res.status === 429) {
       throw new Error("RATE_LIMIT");
