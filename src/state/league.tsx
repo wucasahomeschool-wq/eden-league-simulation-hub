@@ -210,7 +210,7 @@ export function blankPlayer(): LeaguePlayer {
   const base: LeaguePlayer = {
     name: "New Player", position: "CM", starter: false,
     age: 24, morale: MORALE_BASELINE,
-    injuryWeeks: 0, suspensionWeeks: 0, yellowLog: [],
+    injuryWeeks: 0, suspensionWeeks: 0, reservedSlot: null, yellowLog: [],
     salary: 5.0, contractYears: 2,
     rating: 5.0, FIN: 5.0, SHO: 5.0, PAS: 5.0, VIS: 5.0, DRI: 5.0,
     PAC: 5.0, STA: 5.0, DEF: 5.0, TAC: 5.0, POS_attr: 5.0, COM: 5.0,
@@ -224,7 +224,7 @@ export function youthPlayer(): LeaguePlayer {
   const base: LeaguePlayer = {
     name: "Youth Academy Call-up", position: "CM", starter: true,
     age: 18, morale: MORALE_BASELINE,
-    injuryWeeks: 0, suspensionWeeks: 0, yellowLog: [],
+    injuryWeeks: 0, suspensionWeeks: 0, reservedSlot: null, yellowLog: [],
     salary: 1.0, contractYears: 1,
     rating: 1.0, FIN: 1.0, SHO: 1.0, PAS: 1.0, VIS: 1.0, DRI: 1.0,
     PAC: 1.0, STA: 1.0, DEF: 1.0, TAC: 1.0, POS_attr: 1.0, COM: 1.0,
