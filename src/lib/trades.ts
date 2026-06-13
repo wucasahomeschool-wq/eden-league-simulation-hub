@@ -80,7 +80,28 @@ export function calculatePlayerValue(p: LeaguePlayer): number {
   else if (ws <= 8.5) base = 12.0 + ((ws - 7.1) / 1.4) * 6.0;
   else base = 18.0 + ((ws - 8.5) / 1.5) * 27.0;
 
-  return round1(Math.min(50.0, base));
+  // ---- Age curve ----
+  // Peak market value sits in the early-mid 20s; value tapers as a player ages
+  // and a fading veteran is worth meaningfully less than his raw rating implies.
+  const age = p.age ?? 27;
+  let ageMod: number;
+  if (age <= 21) ageMod = 1.08;        // young upside
+  else if (age <= 27) ageMod = 1.0;    // prime
+  else if (age <= 30) ageMod = 0.9;
+  else if (age <= 33) ageMod = 0.78;
+  else ageMod = 0.62;                   // ageing veteran
+
+  // ---- Contract length ----
+  // Long-term control is an asset; an expiring (or expired) deal is a discount
+  // since the buyer must re-sign the player almost immediately.
+  const yrs = p.contractYears ?? 1;
+  let contractMod: number;
+  if (yrs <= 0) contractMod = 0.82;
+  else if (yrs === 1) contractMod = 0.92;
+  else if (yrs >= 4) contractMod = 1.06;
+  else contractMod = 1.0;
+
+  return round1(Math.max(1.0, Math.min(50.0, base * ageMod * contractMod)));
 }
 
 // ---------------- 3. Positional shortage & roster balance utility ----------------
