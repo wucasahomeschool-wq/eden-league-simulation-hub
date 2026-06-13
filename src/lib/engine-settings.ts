@@ -77,6 +77,13 @@ export function applySettings(partial?: Partial<EngineSettings>): EngineSettings
   if (!Array.isArray(settings.manualSimTeams)) {
     settings.manualSimTeams = [...DEFAULT_SETTINGS.manualSimTeams];
   }
+  // Defensive: a blanked/garbled numeric knob (NaN/Infinity from a form field)
+  // would poison every engine that multiplies by it — fall back to the default.
+  for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof EngineSettings)[]) {
+    if (typeof DEFAULT_SETTINGS[key] === "number" && !Number.isFinite(settings[key] as number)) {
+      (settings[key] as number) = DEFAULT_SETTINGS[key] as number;
+    }
+  }
   return settings;
 }
 
