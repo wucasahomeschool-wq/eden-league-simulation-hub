@@ -1670,7 +1670,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         // salaryCap intentionally NOT reverted — it is an app setting, not league data.
         contractsInitialized: data.contractsInitialized ?? prev.contractsInitialized,
       })),
-    resetLeague: () => setState(initState()),
+    resetLeague: () => update(() => initState()), // routed through update() so a full reset is undoable
   };
 
   return <LeagueContext.Provider value={value}>{children}</LeagueContext.Provider>;
