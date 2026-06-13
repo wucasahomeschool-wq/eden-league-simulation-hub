@@ -1046,6 +1046,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       const t = next.teams[name];
       const inLineup = new Set(t.lineup.filter(Boolean));
       const exempt = isManualSimTeam(name);
+      const returning: string[] = [];
       const players = t.players.map((p) => {
         let np = p;
         if (!protectedKeys.has(`${name}::${p.name}`) && (p.injuryWeeks > 0 || p.suspensionWeeks > 0)) {
@@ -1058,6 +1059,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
           // Comeback: returned to availability this week.
           if (wasOut && np.injuryWeeks === 0 && np.suspensionWeeks === 0) {
             np = { ...np, morale: clampMorale(np.morale + 15) };
+            returning.push(np.name);
           }
         }
         // Weekly selection / bench morale (player micro-events skip exempt clubs).
@@ -1067,7 +1069,12 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         }
         return np;
       });
-      teams[name] = { ...t, players };
+      let team = { ...t, players };
+      // Restore recovered players to the exact slot they held before going out.
+      for (const recoveredName of returning) {
+        team = restoreReserved(team, recoveredName);
+      }
+      teams[name] = team;
     }
     let advanced: LeagueState = { ...next, teams };
     if (advanced.currentWeek <= engineSettings.transferWindowLastWeek) {
