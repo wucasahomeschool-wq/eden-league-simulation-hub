@@ -80,11 +80,17 @@ export function applyTeamEvent(team: LeagueTeam, event: TeamEvent): boolean {
   return false;
 }
 
-// Fire the manager: random new tactical mentality + morale reset.
+// Fire the manager: random new tactical mentality + a "new manager bounce".
+// Rather than snapping morale to a flat number, the squad recovers part of the
+// way toward the renewal target (a fresh start lifts spirits but doesn't erase
+// a bad run overnight).
 export function triggerManagerSack(team: LeagueTeam): void {
   const options = TACTICS.filter((t) => t !== team.tactical_style);
   team.tactical_style = options[Math.floor(Math.random() * options.length)];
-  team.morale = settings.managerRenewalMorale;
+  const current = team.morale ?? settings.moraleBaseline;
+  const target = settings.managerRenewalMorale;
+  // Halfway recovery toward the target, guaranteeing at least a small lift.
+  team.morale = clampMorale(Math.max(current + 8, Math.round((current + target) / 2)));
 }
 
 // Apply a player micro event in place. Exempt clubs ignore player events.

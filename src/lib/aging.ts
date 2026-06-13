@@ -21,13 +21,13 @@ export function computeStartingAge(p: LeaguePlayer): number {
   return rand(24, 29); // Prime
 }
 
-// Retirement thresholds.
-const RETIRE_AGE = 35;
-const CRITICAL_PHYSICAL = 3.0;
+// Retirement is a fully MANUAL decision — there are no automatic age/decay
+// cutoffs. Aging only shifts attributes (youth growth, veteran shift); players
+// are only ever removed from a roster via the "Remove Player" control.
 
 export interface AgingResult {
   player: LeaguePlayer;
-  retired: boolean;
+  retired: boolean; // always false now — kept for call-site compatibility
   veteranFulfilled: boolean; // hit max mental progression this offseason
   replacement?: LeaguePlayer;
 }
@@ -75,25 +75,41 @@ export function youthProspect(position: string): LeaguePlayer {
 }
 
 // Advance one offseason for a single player. Returns updated player (rating
-// recomputed), retirement status and any replacement prospect.
+// recomputed) and veteran-fulfilment status. Never retires a player.
 export function ageOnePlayer(p: LeaguePlayer): AgingResult {
+  const r1 = (n: number) => Math.round(n * 10) / 10;
   const age = (p.age ?? 25) + 1;
   let next: LeaguePlayer = { ...p, age };
   let veteranFulfilled = false;
 
-  if (age >= 30) {
+  if (age <= 23) {
+    // Youth development — young players grow into their potential. Physical and
+    // technical attributes rise (steeper the younger they are), mental traits
+    // tick up a little with experience.
+    const phys = age <= 20 ? 0.35 : 0.2;
+    const tech = age <= 20 ? 0.4 : 0.25;
+    next.PAC = r1(Math.min(10.0, next.PAC + phys));
+    next.STA = r1(Math.min(10.0, next.STA + phys));
+    next.DRI = r1(Math.min(10.0, next.DRI + tech));
+    next.PAS = r1(Math.min(10.0, next.PAS + tech * 0.7));
+    next.FIN = r1(Math.min(10.0, next.FIN + tech * 0.6));
+    next.DEF = r1(Math.min(10.0, next.DEF + tech * 0.6));
+    next.TAC = r1(Math.min(10.0, next.TAC + tech * 0.6));
+    next.VIS = r1(Math.min(10.0, next.VIS + 0.15));
+    next.POS_attr = r1(Math.min(10.0, next.POS_attr + 0.15));
+  } else if (age >= 30) {
     // Physical regression — exponential decline of PAC & STA.
     const decay = 1 - Math.pow(1.12, age - 29) * 0.04; // steeper each year
     const factor = Math.max(0.7, decay);
-    next.PAC = Math.max(1.0, Math.round(next.PAC * factor * 10) / 10);
-    next.STA = Math.max(1.0, Math.round(next.STA * factor * 10) / 10);
+    next.PAC = Math.max(1.0, r1(next.PAC * factor));
+    next.STA = Math.max(1.0, r1(next.STA * factor));
 
     // Mental progression — VIS, POS_attr, COM rise with experience.
     const gain = 0.3;
     const before = next.VIS + next.POS_attr + next.COM;
-    next.VIS = Math.min(10.0, Math.round((next.VIS + gain) * 10) / 10);
-    next.POS_attr = Math.min(10.0, Math.round((next.POS_attr + gain) * 10) / 10);
-    next.COM = Math.min(10.0, Math.round((next.COM + gain) * 10) / 10);
+    next.VIS = Math.min(10.0, r1(next.VIS + gain));
+    next.POS_attr = Math.min(10.0, r1(next.POS_attr + gain));
+    next.COM = Math.min(10.0, r1(next.COM + gain));
     // Veteran fulfillment when mental attributes reach the ceiling.
     if (next.VIS >= 10 && next.POS_attr >= 10 && next.COM >= 10 && before < 30) {
       veteranFulfilled = true;
@@ -102,9 +118,7 @@ export function ageOnePlayer(p: LeaguePlayer): AgingResult {
 
   next.rating = computeOverall(next);
 
-  const retired = age >= RETIRE_AGE || next.PAC < CRITICAL_PHYSICAL || next.STA < CRITICAL_PHYSICAL;
-  if (retired) {
-    return { player: next, retired: true, veteranFulfilled, replacement: youthProspect(p.position) };
-  }
+  // Retirement is manual only — always return retired:false.
   return { player: next, retired: false, veteranFulfilled };
 }
+
