@@ -110,16 +110,16 @@ function ProposalCard({
   return (
     <div className="rounded-xl border bg-card p-4">
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-lg border bg-panel/40 p-3">
-          <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t.teamA}</div>
+        <div className="rounded-lg border border-highlight-blue/40 bg-highlight-blue/5 p-3">
+          <div className="text-xs font-bold uppercase tracking-wide text-highlight-blue">{t.teamA}</div>
           <p className="mt-1 text-sm">
             Sends <span className="font-semibold">{t.aSends}</span>
             {t.cashBReceives > 0 && <> + <span className="font-mono">${t.cashBReceives}M</span></>}
           </p>
           <p className="mt-1 text-[11px] font-mono text-success">Utility +{t.deltaUA}</p>
         </div>
-        <div className="rounded-lg border bg-panel/40 p-3">
-          <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t.teamB}</div>
+        <div className="rounded-lg border border-highlight-red/40 bg-highlight-red/5 p-3">
+          <div className="text-xs font-bold uppercase tracking-wide text-highlight-red">{t.teamB}</div>
           <p className="mt-1 text-sm">
             Sends <span className="font-semibold">{t.bSends}</span>
             {t.cashAReceives > 0 && <> + <span className="font-mono">${t.cashAReceives}M</span></>}
