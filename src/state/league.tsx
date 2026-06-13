@@ -610,6 +610,9 @@ function applyMatchEffects(
 ): { teams: Record<string, LeagueTeam>; protectedKeys: Set<string> } {
   const next = { ...teams };
   const protectedKeys = new Set<string>();
+  // Players benched by this match (red, second yellow, injury) — their starting
+  // slot is reserved so they reclaim it when they recover.
+  const outPlayers: { team: string; name: string }[] = [];
 
   const updatePlayerIn = (
     teamName: string,
