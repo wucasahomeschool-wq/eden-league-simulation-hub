@@ -1613,9 +1613,15 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       update((prev) => {
         const r = runCycle(prev);
         actions = r.actions;
+        // Released players must not linger as ghost names in any lineup — repair
+        // every squad so freed starters are dropped and their slots refilled.
+        const teams: Record<string, LeagueTeam> = {};
+        for (const name of prev.teamOrder) {
+          teams[name] = r.teams[name] ? repairLineup(r.teams[name]) : r.teams[name];
+        }
         return {
           ...prev,
-          teams: r.teams,
+          teams,
           freeAgents: r.freeAgents,
           salaryCap: r.salaryCap,
         };
