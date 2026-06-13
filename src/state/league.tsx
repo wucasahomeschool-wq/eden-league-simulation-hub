@@ -912,14 +912,14 @@ function moveTrade(
   return { ...prev, teams: { ...prev.teams, [aName]: aTeam, [bName]: bTeam } };
 }
 
-// Offseason aging + retirement for one club.
+// Offseason aging for one club (no automatic retirement — removals are manual).
 function offseasonTeam(team: LeagueTeam): LeagueTeam {
   const players: LeaguePlayer[] = [];
   let moraleBump = 0;
   for (const p of team.players) {
     const res = ageOnePlayer({ ...p, injuryWeeks: 0, suspensionWeeks: 0, reservedSlot: null, yellowLog: [] });
     if (res.veteranFulfilled) moraleBump += 1;
-    players.push(res.retired ? res.replacement! : res.player);
+    players.push(res.player);
   }
   // Veteran fulfillment lifts overall club morale slightly.
   // Morale carries into the next season, then regresses 7 points toward the
