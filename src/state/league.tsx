@@ -637,6 +637,7 @@ function applyMatchEffects(
           starter: false,
         }));
         protectedKeys.add(`${ps.team}::${ps.name}`);
+        outPlayers.push({ team: ps.team, name: ps.name });
       } else if (ps.yellow > 0) {
         updatePlayerIn(ps.team, ps.name, (p) => {
           const log = [...p.yellowLog, currentWeek].filter(
