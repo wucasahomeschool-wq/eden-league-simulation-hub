@@ -842,6 +842,23 @@ function autoPromote(team: LeagueTeam, incoming: LeaguePlayer[]): LeagueTeam {
   return { ...team, lineup };
 }
 
+// Drain any manager sacks recorded during the just-applied morale events and
+// queue AI-generated replacements (pendingGeneration). Returns the updated
+// managers map (unchanged reference when nothing was sacked).
+function withPendingSacks(managers: Record<string, ManagerRecord>): Record<string, ManagerRecord> {
+  const sacked = drainSackedTeams();
+  if (sacked.length === 0) return managers;
+  const next = { ...managers };
+  for (const name of sacked) {
+    next[name] = {
+      name: "Interim Manager",
+      personality: "A caretaker manager holding the fort until a permanent appointment.",
+      pendingGeneration: true,
+    };
+  }
+  return next;
+}
+
 // Core multi-player trade: move named players + cash between two clubs, apply
 // morale events, auto-promote upgrades, and re-sync lineups.
 function moveTrade(
