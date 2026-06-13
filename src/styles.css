@@ -78,9 +78,15 @@
   --panel: oklch(0.9 0.07 146);
   --console-bg: oklch(0.24 0.06 150);
   --console-fg: oklch(0.9 0.14 145);
+  /* Energetic red + blue highlights for accents across the app */
+  --highlight-red: oklch(0.58 0.22 25);
+  --highlight-red-foreground: oklch(0.99 0.01 25);
+  --highlight-blue: oklch(0.55 0.2 255);
+  --highlight-blue-foreground: oklch(0.99 0.01 255);
   /* Stadium effects */
   --gradient-pitch: linear-gradient(160deg, oklch(0.6 0.16 150) 0%, oklch(0.78 0.14 146) 55%, oklch(0.86 0.12 142) 100%);
   --shadow-glow: 0 0 0 1px color-mix(in oklab, var(--primary) 25%, transparent), 0 12px 30px -12px color-mix(in oklab, var(--primary) 55%, transparent);
+  --gradient-rb: linear-gradient(90deg, var(--highlight-blue) 0%, var(--primary) 50%, var(--highlight-red) 100%);
 }
 
 @theme inline {
