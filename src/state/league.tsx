@@ -909,7 +909,7 @@ function offseasonTeam(team: LeagueTeam): LeagueTeam {
   const players: LeaguePlayer[] = [];
   let moraleBump = 0;
   for (const p of team.players) {
-    const res = ageOnePlayer({ ...p, injuryWeeks: 0, suspensionWeeks: 0, yellowLog: [] });
+    const res = ageOnePlayer({ ...p, injuryWeeks: 0, suspensionWeeks: 0, reservedSlot: null, yellowLog: [] });
     if (res.veteranFulfilled) moraleBump += 1;
     players.push(res.retired ? res.replacement! : res.player);
   }
