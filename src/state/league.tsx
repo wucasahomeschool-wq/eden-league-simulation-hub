@@ -49,6 +49,9 @@ export interface LeaguePlayer {
   morale: number; // 0–100, baseline 50
   injuryWeeks: number; // 0 = healthy; SEASON_ENDING_WEEKS = out for season
   suspensionWeeks: number; // 0 = not suspended
+  // Slot the player should reclaim when they recover. null = not out / no reservation;
+  // >= 0 = the formation slot index they started in; -1 = they were a bench player.
+  reservedSlot: number | null;
   yellowLog: number[]; // weeks in which unpunished yellows were received
   salary: number; // annual salary in $M (contract layer)
   contractYears: number; // years remaining on contract
