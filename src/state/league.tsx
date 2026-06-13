@@ -839,8 +839,8 @@ function moveTrade(
 
   const aSet = new Set(aPlayers.filter(Boolean));
   const bSet = new Set(bPlayers.filter(Boolean));
-  const movingFromA = teamA.players.filter((p) => aSet.has(p.name)).map((p) => ({ ...p, starter: false }));
-  const movingFromB = teamB.players.filter((p) => bSet.has(p.name)).map((p) => ({ ...p, starter: false }));
+  const movingFromA = teamA.players.filter((p) => aSet.has(p.name)).map((p) => ({ ...p, starter: false, reservedSlot: null }));
+  const movingFromB = teamB.players.filter((p) => bSet.has(p.name)).map((p) => ({ ...p, starter: false, reservedSlot: null }));
   if (!movingFromA.length && !movingFromB.length && cashAReceives === 0 && cashBReceives === 0) return prev;
 
   const aBudgetBefore = parseBudget(teamA.budget);
