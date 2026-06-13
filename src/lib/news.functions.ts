@@ -10,6 +10,7 @@ export type NewsKind = "postgame" | "roundup" | "drama";
 interface NewsInput {
   kind: NewsKind;
   brief: string; // pre-formatted factual digest assembled on the client
+  focus?: string; // optional reader-supplied angle/specification for the story
 }
 
 const SYSTEM_BY_KIND: Record<NewsKind, string> = {
