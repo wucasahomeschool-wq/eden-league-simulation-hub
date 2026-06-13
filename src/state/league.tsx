@@ -256,6 +256,7 @@ export function initState(): LeagueState {
         morale: MORALE_BASELINE,
         injuryWeeks: 0,
         suspensionWeeks: 0,
+        reservedSlot: null,
         yellowLog: [],
         salary: 0,
         contractYears: 0,

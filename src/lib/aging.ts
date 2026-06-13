@@ -42,6 +42,7 @@ export function youthProspect(position: string): LeaguePlayer {
     morale: 50,
     injuryWeeks: 0,
     suspensionWeeks: 0,
+    reservedSlot: null,
     yellowLog: [],
     salary: 5.0,
     contractYears: 2,
