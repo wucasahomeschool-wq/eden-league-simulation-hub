@@ -9,7 +9,7 @@ import { computeOverall } from "@/lib/ratings";
 const rand = (min: number, max: number) =>
   Math.floor(Math.random() * (max - min + 1)) + min;
 
-const mean = (a: number[]) => a.reduce((s, v) => s + v, 0) / a.length;
+const mean = (a: number[]) => (a.length === 0 ? 0 : a.reduce((s, v) => s + v, 0) / a.length);
 
 // Physical-to-mental ratio classification → starting age band.
 export function computeStartingAge(p: LeaguePlayer): number {
