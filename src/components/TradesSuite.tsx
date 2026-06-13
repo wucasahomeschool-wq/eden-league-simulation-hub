@@ -53,8 +53,8 @@ export function TradesSuite() {
           <div>
             <h2 className="text-base font-extrabold uppercase tracking-wide">Automatic Trade Desk</h2>
             <p className="text-xs text-muted-foreground">
-              The market engine scans all 24 clubs each match week and surfaces every deal whose
-              combined utility clears the quality threshold — not a fixed count.{" "}
+              The market engine scans all 24 clubs each match week and ranks the best deals — the
+              top {TOP_COUNT} are shown first, with the option to reveal more lesser trades.{" "}
               {inWindow ? "Transfer window OPEN." : `Window closed (reopens next season, runs through Week ${lastWindowWeek}).`}
             </p>
           </div>
@@ -65,20 +65,31 @@ export function TradesSuite() {
 
         {state.tradeProposals.length === 0 ? (
           <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
-            No proposals clear the utility threshold right now. Deals are generated automatically each
-            week, or run the engine now.
+            No proposals available right now. Deals are generated automatically each week, or run the
+            engine now.
           </div>
         ) : (
-          <div className="space-y-3">
-            {state.tradeProposals.map((t) => (
-              <ProposalCard
-                key={t.id}
-                t={t}
-                onAccept={() => acceptProposal(t)}
-                onDecline={() => declineTrade(t.id)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="space-y-3">
+              {(showAll ? state.tradeProposals : state.tradeProposals.slice(0, TOP_COUNT)).map((t) => (
+                <ProposalCard
+                  key={t.id}
+                  t={t}
+                  onAccept={() => acceptProposal(t)}
+                  onDecline={() => declineTrade(t.id)}
+                />
+              ))}
+            </div>
+            {state.tradeProposals.length > TOP_COUNT && (
+              <div className="mt-3 flex justify-center">
+                <Button size="sm" variant="outline" onClick={() => setShowAll((v) => !v)} className="font-semibold">
+                  {showAll
+                    ? "SHOW LESS"
+                    : `SHOW MORE (${state.tradeProposals.length - TOP_COUNT} MORE DEALS)`}
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </section>
 
