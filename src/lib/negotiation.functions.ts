@@ -52,7 +52,19 @@ function describeTerms(t: NegotiationTerms): string {
   ].join("\n");
 }
 
-async function callGateway(apiKey: string, system: string, user: string, jsonMode: boolean) {
+// Tolerant JSON extraction: models sometimes wrap JSON in prose or code fences.
+function extractJson<T>(content: string): T | null {
+  const start = content.indexOf("{");
+  const end = content.lastIndexOf("}");
+  if (start === -1 || end === -1 || end < start) return null;
+  try {
+    return JSON.parse(content.slice(start, end + 1)) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function callGateway(apiKey: string, system: string, user: string) {
   const res = await fetch(GATEWAY, {
     method: "POST",
     headers: {
