@@ -10,6 +10,7 @@ export type NewsKind = "postgame" | "roundup" | "drama";
 interface NewsInput {
   kind: NewsKind;
   brief: string; // pre-formatted factual digest assembled on the client
+  focus?: string; // optional reader-supplied angle/specification for the story
 }
 
 const SYSTEM_BY_KIND: Record<NewsKind, string> = {
@@ -49,7 +50,9 @@ export const generateNews = createServerFn({ method: "POST" })
     if (typeof data.brief !== "string" || data.brief.trim().length === 0) {
       throw new Error("Missing data brief");
     }
-    return data;
+    const focus =
+      typeof data.focus === "string" ? data.focus.trim().slice(0, 500) : "";
+    return { ...data, focus };
   })
   .handler(async ({ data }) => {
     const apiKey = process.env.LOVABLE_API_KEY;
@@ -70,7 +73,9 @@ export const generateNews = createServerFn({ method: "POST" })
           { role: "system", content: system },
           {
             role: "user",
-            content: `DATA (the only facts you may use):\n\n${data.brief}\n\nWrite the article now.`,
+            content: data.focus
+              ? `DATA (the only facts you may use):\n\n${data.brief}\n\nEDITOR'S BRIEF — center the article on this angle: "${data.focus}". Use ONLY the facts above to support it; if the data does not back up part of the requested angle, lean on what the data does show rather than inventing anything. Write the article now.`
+              : `DATA (the only facts you may use):\n\n${data.brief}\n\nWrite the article now.`,
           },
         ],
       }),

@@ -21,6 +21,7 @@ export function NewsSuite() {
   const [tab, setTab] = useState<Tab>("postgame");
   const [fixtureId, setFixtureId] = useState<string>("");
   const [week, setWeek] = useState<number>(0);
+  const [focus, setFocus] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [article, setArticle] = useState<string | null>(null);
@@ -62,7 +63,7 @@ export function NewsSuite() {
 
     setLoading(true);
     try {
-      const res = await run({ data: { kind: tab, brief } });
+      const res = await run({ data: { kind: tab, brief, focus: focus.trim() || undefined } });
       setArticle(res.article);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -139,6 +140,24 @@ export function NewsSuite() {
           {loading ? "Filing story…" : "✍ Write Article"}
         </Button>
       </div>
+
+      <label className="flex flex-col gap-1 text-xs font-semibold uppercase text-muted-foreground">
+        STORY ANGLE <span className="font-normal normal-case">(optional — tell the writer what to focus on)</span>
+        <textarea
+          value={focus}
+          onChange={(e) => setFocus(e.target.value)}
+          rows={2}
+          maxLength={500}
+          placeholder={
+            tab === "drama"
+              ? 'e.g. "Frame this around the underdog playoff run" or "Focus on the title-race pressure on the leaders"'
+              : tab === "roundup"
+              ? 'e.g. "Lead with the relegation battle" or "Spotlight the golden boot race"'
+              : 'e.g. "Focus on the goalkeeper\'s performance" or "Frame it as a tactical upset"'
+          }
+          className="resize-y rounded-md border bg-background px-3 py-2 text-sm font-normal text-foreground placeholder:text-muted-foreground"
+        />
+      </label>
 
       {error && (
         <div className="rounded-lg border-l-4 border-highlight-red bg-card px-4 py-3 text-sm text-foreground">
