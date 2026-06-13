@@ -392,6 +392,13 @@ function normalize(state: LeagueState): LeagueState {
   // Merge persisted tuning knobs into the live engine singleton so every
   // engine immediately reads the current values (any load path hits normalize).
   const mergedSettings = applySettings(state.settings);
+  // Managers: keep any already-persisted manager identities, seed defaults for
+  // clubs that don't have one yet (older saves, newly added teams).
+  const seededManagers = buildManagers(state.teamOrder);
+  const managers: Record<string, ManagerRecord> = {};
+  for (const name of state.teamOrder) {
+    managers[name] = state.managers?.[name] ?? seededManagers[name];
+  }
   return {
     ...state,
     season: state.season ?? 1,
@@ -403,6 +410,7 @@ function normalize(state: LeagueState): LeagueState {
     salaryCap,
     freeAgents: state.freeAgents ?? [],
     contractsInitialized,
+    managers,
     settings: { ...mergedSettings, contractExemptTeams: [...mergedSettings.contractExemptTeams] },
   };
 }
