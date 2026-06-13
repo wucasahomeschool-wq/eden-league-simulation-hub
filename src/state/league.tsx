@@ -1259,6 +1259,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     canRedo: state.redoStack.length > 0,
     setResult: (fixtureId, homeGoals, awayGoals, method, payload) =>
       update((prev) => {
+        if (prev.results[fixtureId]) return prev; // already recorded — never double-apply effects
         const fixture = prev.fixtures.find((f) => f.id === fixtureId);
         const preStandings = computeStandings(prev);
         const { teams, protectedKeys } = applyMatchEffects(
