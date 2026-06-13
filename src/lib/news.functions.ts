@@ -73,7 +73,9 @@ export const generateNews = createServerFn({ method: "POST" })
           { role: "system", content: system },
           {
             role: "user",
-            content: `DATA (the only facts you may use):\n\n${data.brief}\n\nWrite the article now.`,
+            content: data.focus
+              ? `DATA (the only facts you may use):\n\n${data.brief}\n\nEDITOR'S BRIEF — center the article on this angle: "${data.focus}". Use ONLY the facts above to support it; if the data does not back up part of the requested angle, lean on what the data does show rather than inventing anything. Write the article now.`
+              : `DATA (the only facts you may use):\n\n${data.brief}\n\nWrite the article now.`,
           },
         ],
       }),
