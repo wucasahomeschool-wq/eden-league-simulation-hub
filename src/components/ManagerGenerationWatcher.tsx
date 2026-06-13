@@ -13,21 +13,31 @@ export function ManagerGenerationWatcher() {
   const { state, replaceManager } = useLeague();
   const run = useServerFn(generateManager);
   const inFlight = useRef<Set<string>>(new Set());
+  // Per-team cooldown timestamps: after a failed generation we wait before
+  // retrying so a rate-limited / down gateway is never hammered on every
+  // subsequent state change.
+  const cooldownUntil = useRef<Map<string, number>>(new Map());
+  const RETRY_COOLDOWN_MS = 60_000;
 
   useEffect(() => {
     const pending = Object.entries(state.managers ?? {}).filter(
       ([, m]) => m.pendingGeneration
     );
+    const now = Date.now();
     for (const [team] of pending) {
       if (inFlight.current.has(team)) continue;
+      const until = cooldownUntil.current.get(team) ?? 0;
+      if (now < until) continue; // still cooling down from a recent failure
       inFlight.current.add(team);
       const tacticalStyle = state.teams[team]?.tactical_style;
       run({ data: { team, tacticalStyle } })
         .then((res) => {
+          cooldownUntil.current.delete(team);
           replaceManager(team, { name: res.name, personality: res.personality });
         })
         .catch(() => {
-          // Leave the interim manager in place; retry on a later change.
+          // Back off before the next attempt; the interim manager stays in place.
+          cooldownUntil.current.set(team, Date.now() + RETRY_COOLDOWN_MS);
         })
         .finally(() => {
           inFlight.current.delete(team);
