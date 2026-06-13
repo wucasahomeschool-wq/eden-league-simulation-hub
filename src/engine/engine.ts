@@ -1246,10 +1246,15 @@ export function run_match(
       evaluate_substitutions(team_B, TUP, -diff_A, log);
 
       // Live in-match tactical shifts are gated by the Dynamic Tactics setting.
+      // Capture each style BEFORE the call: evaluate_live_tactics mutates
+      // team.tactical_style in place, so comparing its return value to the
+      // (already-updated) team style would always match and disable the cooldown.
       if (settings.dynamicTactics) {
-        if (evaluate_live_tactics(team_A, team_B, TUP, diff_A, last_change_A, log) !== team_A.tactical_style)
+        const prev_style_A = team_A.tactical_style;
+        if (evaluate_live_tactics(team_A, team_B, TUP, diff_A, last_change_A, log) !== prev_style_A)
           last_change_A = TUP;
-        if (evaluate_live_tactics(team_B, team_A, TUP, -diff_A, last_change_B, log) !== team_B.tactical_style)
+        const prev_style_B = team_B.tactical_style;
+        if (evaluate_live_tactics(team_B, team_A, TUP, -diff_A, last_change_B, log) !== prev_style_B)
           last_change_B = TUP;
       }
 

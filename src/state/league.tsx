@@ -228,9 +228,17 @@ export function restoreReserved(team: LeagueTeam, playerName: string): LeagueTea
   const player = team.players.find((p) => p.name === playerName);
   const slot = player?.reservedSlot ?? null;
   let lineup = team.lineup;
-  if (slot != null && slot >= 0 && slot < lineup.length) {
+  if (slot != null && slot >= 0) {
     lineup = lineup.map((n) => (n === playerName ? "" : n)); // avoid duplicates
-    lineup = lineup.map((n, i) => (i === slot ? playerName : n));
+    if (slot < lineup.length) {
+      // The original starting slot still exists — reclaim it.
+      lineup = lineup.map((n, i) => (i === slot ? playerName : n));
+    } else {
+      // Formation shrank and the exact slot is gone: fall back to the first
+      // empty starting slot so a returning starter isn't silently dropped.
+      const empty = lineup.findIndex((n) => !n);
+      if (empty >= 0) lineup = lineup.map((n, i) => (i === empty ? playerName : n));
+    }
   }
   const players = team.players.map((p) =>
     p.name === playerName ? { ...p, reservedSlot: null } : p
@@ -1452,14 +1460,20 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         };
       }),
     runContractCycle: () => {
-      const r = runCycle(state);
-      update(() => ({
-        ...state,
-        teams: r.teams,
-        freeAgents: r.freeAgents,
-        salaryCap: r.salaryCap,
-      }));
-      return r.actions;
+      // Run the cycle inside the functional updater against the freshest state
+      // (avoids the stale render-closure `state`), capturing the report to return.
+      let actions: ContractAction[] = [];
+      update((prev) => {
+        const r = runCycle(prev);
+        actions = r.actions;
+        return {
+          ...prev,
+          teams: r.teams,
+          freeAgents: r.freeAgents,
+          salaryCap: r.salaryCap,
+        };
+      });
+      return actions;
     },
     setSalaryCap: (cap) =>
       update((prev) => {
