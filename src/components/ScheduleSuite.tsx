@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useLeague, isManualOnly, isWeekComplete, type FixtureEntry,
 } from "@/state/league";
