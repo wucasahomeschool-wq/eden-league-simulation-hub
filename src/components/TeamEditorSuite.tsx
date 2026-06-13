@@ -48,11 +48,14 @@ export function TeamEditorSuite() {
     state, updateBudget, updatePlayer,
     setInjuryWeeks, setSuspensionWeeks, addPlayer, removePlayer, renameTeam,
     setLineupSlot, setFormation, autoFillLineup, setTacticalStyle,
-    setSalary, setContractYears,
+    setSalary, setContractYears, replaceManager,
   } = useLeague();
   const [team, setTeam] = useState(state.teamOrder[0]);
   const [nameDraft, setNameDraft] = useState(team);
   const [formationDraft, setFormationDraft] = useState("3-3-2");
+  const manager = state.managers?.[team];
+  const [mgrNameDraft, setMgrNameDraft] = useState(manager?.name ?? "");
+  const [mgrDescDraft, setMgrDescDraft] = useState(manager?.personality ?? "");
 
   useEffect(() => {
     if (!state.teams[team]) setTeam(state.teamOrder[0]);
@@ -61,9 +64,20 @@ export function TeamEditorSuite() {
   useEffect(() => {
     if (state.teams[team]) setFormationDraft(state.teams[team].formation);
   }, [team, state.teams]);
+  useEffect(() => {
+    const m = state.managers?.[team];
+    setMgrNameDraft(m?.name ?? "");
+    setMgrDescDraft(m?.personality ?? "");
+  }, [team, state.managers]);
 
   const t = state.teams[team];
   if (!t) return null;
+
+  const mgrDirty =
+    mgrNameDraft !== (manager?.name ?? "") || mgrDescDraft !== (manager?.personality ?? "");
+  function saveManager() {
+    replaceManager(team, { name: mgrNameDraft.trim(), personality: mgrDescDraft.trim() });
+  }
 
   const contractEditable = isContractExempt(team);
   const payroll = t.players.reduce((s, p) => s + (p.salary ?? 0), 0);
