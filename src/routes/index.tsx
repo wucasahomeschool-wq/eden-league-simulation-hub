@@ -54,12 +54,13 @@ function Hub() {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 border-b bg-card/90 backdrop-blur">
+        <div className="h-1 w-full" style={{ backgroundImage: "var(--gradient-rb)" }} />
         <div className="mx-auto max-w-6xl px-4 py-3">
           <div className="flex items-center gap-2">
             <button
               onClick={prev}
               aria-label="Previous suite"
-              className="ml-auto select-none px-3 py-1 text-2xl font-bold text-muted-foreground transition-colors hover:text-primary"
+              className="ml-auto select-none px-3 py-1 text-2xl font-bold text-highlight-blue transition-colors hover:opacity-70"
             >
               ‹
             </button>
@@ -77,7 +78,7 @@ function Hub() {
             <button
               onClick={next}
               aria-label="Next suite"
-              className="mr-auto select-none px-3 py-1 text-2xl font-bold text-muted-foreground transition-colors hover:text-primary"
+              className="mr-auto select-none px-3 py-1 text-2xl font-bold text-highlight-red transition-colors hover:opacity-70"
             >
               ›
             </button>
@@ -85,6 +86,7 @@ function Hub() {
           <Toolbar />
         </div>
       </header>
+
 
       <main className="mx-auto max-w-6xl px-4 py-6">
         {mounted ? SUITES[idx].render() : (
