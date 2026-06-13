@@ -228,9 +228,17 @@ export function restoreReserved(team: LeagueTeam, playerName: string): LeagueTea
   const player = team.players.find((p) => p.name === playerName);
   const slot = player?.reservedSlot ?? null;
   let lineup = team.lineup;
-  if (slot != null && slot >= 0 && slot < lineup.length) {
+  if (slot != null && slot >= 0) {
     lineup = lineup.map((n) => (n === playerName ? "" : n)); // avoid duplicates
-    lineup = lineup.map((n, i) => (i === slot ? playerName : n));
+    if (slot < lineup.length) {
+      // The original starting slot still exists — reclaim it.
+      lineup = lineup.map((n, i) => (i === slot ? playerName : n));
+    } else {
+      // Formation shrank and the exact slot is gone: fall back to the first
+      // empty starting slot so a returning starter isn't silently dropped.
+      const empty = lineup.findIndex((n) => !n);
+      if (empty >= 0) lineup = lineup.map((n, i) => (i === empty ? playerName : n));
+    }
   }
   const players = team.players.map((p) =>
     p.name === playerName ? { ...p, reservedSlot: null } : p
