@@ -21,13 +21,13 @@ export function computeStartingAge(p: LeaguePlayer): number {
   return rand(24, 29); // Prime
 }
 
-// Retirement thresholds.
-const RETIRE_AGE = 35;
-const CRITICAL_PHYSICAL = 3.0;
+// Retirement is a fully MANUAL decision — there are no automatic age/decay
+// cutoffs. Aging only shifts attributes (youth growth, veteran shift); players
+// are only ever removed from a roster via the "Remove Player" control.
 
 export interface AgingResult {
   player: LeaguePlayer;
-  retired: boolean;
+  retired: boolean; // always false now — kept for call-site compatibility
   veteranFulfilled: boolean; // hit max mental progression this offseason
   replacement?: LeaguePlayer;
 }
