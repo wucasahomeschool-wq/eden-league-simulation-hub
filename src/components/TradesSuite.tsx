@@ -10,6 +10,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 
+const TOP_COUNT = 5;
+
+
 const NONE = "__none__";
 
 export function TradesSuite() {
