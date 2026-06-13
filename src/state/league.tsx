@@ -645,6 +645,7 @@ function applyMatchEffects(
           );
           if (log.length >= 2) {
             protectedKeys.add(`${ps.team}::${ps.name}`);
+            outPlayers.push({ team: ps.team, name: ps.name });
             return {
               ...p,
               suspensionWeeks: Math.max(p.suspensionWeeks, YELLOW_SUSPENSION),
