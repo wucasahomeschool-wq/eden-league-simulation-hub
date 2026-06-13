@@ -1404,10 +1404,9 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     removePlayer: (team, index) =>
       update((prev) => {
         const t = prev.teams[team];
-        const removed = t.players[index]?.name;
         const players = t.players.filter((_, i) => i !== index);
-        const lineup = t.lineup.map((n) => (n === removed ? "" : n));
-        return { ...prev, teams: { ...prev.teams, [team]: syncStarters({ ...t, players, lineup }) } };
+        // repairLineup drops the removed player and backfills their slot from the bench.
+        return { ...prev, teams: { ...prev.teams, [team]: repairLineup({ ...t, players }) } };
       }),
     renameTeam: (oldName, newName) =>
       update((prev) => {
