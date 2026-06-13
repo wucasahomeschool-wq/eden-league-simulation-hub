@@ -32,10 +32,31 @@ export interface AgingResult {
   replacement?: LeaguePlayer;
 }
 
+// Pools used to give every academy prospect a unique, identifiable name. Names
+// are used as identifiers across lineups/leaderboards, so duplicates would
+// collide — combine a random name with a unique numeric suffix.
+const PROSPECT_FIRST = [
+  "Theo", "Luka", "Mateo", "Kai", "Noah", "Eli", "Arlo", "Rio", "Zane", "Cody",
+  "Finn", "Jude", "Levi", "Remy", "Cruz", "Ezra", "Niko", "Dario", "Sami", "Tomas",
+];
+const PROSPECT_LAST = [
+  "Vega", "Bauer", "Reyes", "Castro", "Mensah", "Okafor", "Sato", "Lindqvist",
+  "Moreau", "Petrov", "Haaland", "Diallo", "Costa", "Nakamura", "Ferreira",
+  "Andersen", "Kovac", "Esposito", "Marsh", "Volkov",
+];
+let prospectCounter = 0;
+function uniqueProspectName(): string {
+  const first = PROSPECT_FIRST[rand(0, PROSPECT_FIRST.length - 1)];
+  const last = PROSPECT_LAST[rand(0, PROSPECT_LAST.length - 1)];
+  prospectCounter += 1;
+  // Suffix guarantees uniqueness even if the random pick repeats.
+  return `${first} ${last} #${prospectCounter}${rand(10, 99)}`;
+}
+
 // Generate a fresh 17-year-old baseline prospect to replace a retiree.
 export function youthProspect(position: string): LeaguePlayer {
   const base: LeaguePlayer = {
-    name: "Academy Prospect",
+    name: uniqueProspectName(),
     position,
     starter: false,
     age: 17,
