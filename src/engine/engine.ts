@@ -407,6 +407,11 @@ function check_injuries(
         p.injured_severe = true;
         team.momentum = Math.max(0.85, team.momentum - 0.05);
         team.active_roster = team.active_roster.filter((x) => x !== p);
+        // Keep the carried-off player on the roster object (bench) so the
+        // post-match payload bridge can record the injury. Sub-selection logic
+        // already filters out injured_severe players, so this is bookkeeping
+        // only and does not change the simulation or RNG sequence.
+        if (!team.bench.includes(p)) team.bench.push(p);
         force_emergency_sub(team, p, current_TUP, log);
       } else {
         log.push(`[${f1(current_TUP)}'] MINOR INJURY: ${p.name} (${team.name}) picks up a knock.`);
