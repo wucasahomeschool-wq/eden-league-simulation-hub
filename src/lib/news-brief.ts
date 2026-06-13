@@ -11,7 +11,7 @@ function ratingOf(state: LeagueState, team: string, name: string): string {
 
 function describePlayers(state: LeagueState, payload: MatchPayload): string {
   const lines: string[] = [];
-  for (const p of payload.players) {
+  for (const p of payload.players ?? []) {
     const bits: string[] = [];
     if (p.goals > 0) bits.push(`${p.goals} goal${p.goals > 1 ? "s" : ""}`);
     if (p.assists > 0) bits.push(`${p.assists} assist${p.assists > 1 ? "s" : ""}`);
