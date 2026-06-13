@@ -1669,7 +1669,9 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         tradeProposals: data.tradeProposals ?? [],
         freeAgents: data.freeAgents ?? prev.freeAgents,
         // salaryCap intentionally NOT reverted — it is an app setting, not league data.
-        contractsInitialized: data.contractsInitialized ?? prev.contractsInitialized,
+        // Contracts follow the live app (like salaryCap), never the snapshot — a
+        // pre-contracts snapshot must not trigger a salary-resetting re-init.
+        contractsInitialized: prev.contractsInitialized,
       })),
     resetLeague: () => update(() => initState()), // routed through update() so a full reset is undoable
   };
