@@ -1477,6 +1477,17 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       })),
     refreshTradeProposals: () =>
       update((prev) => ({ ...prev, tradeProposals: generateTradeProposals(prev) })),
+    replaceManager: (team, manager) =>
+      update((prev) => {
+        if (!prev.teams[team]) return prev;
+        return {
+          ...prev,
+          managers: {
+            ...prev.managers,
+            [team]: { name: manager.name, personality: manager.personality },
+          },
+        };
+      }),
     setSalary: (team, index, salary) =>
       update((prev) => {
         const players = prev.teams[team].players.map((p, i) =>
