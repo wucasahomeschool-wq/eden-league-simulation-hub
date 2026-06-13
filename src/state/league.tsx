@@ -1170,6 +1170,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         const next: LeagueState = {
           ...prev,
           teams: moraleTeams,
+          managers: withPendingSacks(prev.managers),
           results: { ...prev.results, [fixtureId]: { homeGoals, awayGoals, method } },
           payloads: payload ? { ...prev.payloads, [fixtureId]: payload } : prev.payloads,
         };
