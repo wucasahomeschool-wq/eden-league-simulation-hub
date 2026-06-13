@@ -944,7 +944,8 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
 
   // Persist the live league document to Cloud (undo history is kept local only).
   function pushToCloud(snapshot: LeagueState) {
-    const nextVersion = versionRef.current + 1;
+    const prevVersion = versionRef.current;
+    const nextVersion = prevVersion + 1;
     const { undoStack: _ignore, redoStack: _ignore2, ...rest } = snapshot;
     const data = { ...rest, undoStack: [], redoStack: [] };
     versionRef.current = nextVersion;
@@ -953,7 +954,13 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       .from("league_state")
       .upsert({ id: CLOUD_ROW_ID, data: data as unknown as Record<string, unknown>, version: nextVersion, updated_at: new Date().toISOString() } as never)
       .then(({ error }) => {
-        if (error) console.warn("[league] cloud save failed", error.message);
+        if (error) {
+          console.warn("[league] cloud save failed", error.message);
+          // Roll back the optimistic version bump so a FAILED write doesn't leave
+          // versionRef ahead of Cloud — otherwise later remote updates look "stale"
+          // and get silently ignored. Only roll back if no newer write intervened.
+          if (versionRef.current === nextVersion) versionRef.current = prevVersion;
+        }
       });
   }
 
