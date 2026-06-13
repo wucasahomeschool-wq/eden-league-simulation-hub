@@ -164,7 +164,52 @@ export function TeamEditorSuite() {
         </div>
       </div>
 
+      {/* Manager slot — kept separate from players */}
+      <div className="mb-6 rounded-xl border border-amber-300/60 bg-amber-50/60 p-4 shadow-lg">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="text-sm font-bold uppercase tracking-wide text-amber-900">Manager</h3>
+          {isContractExempt(team) && (
+            <span className="rounded bg-amber-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
+              User Controlled
+            </span>
+          )}
+        </div>
+        <div className="grid gap-4 md:grid-cols-[260px_1fr]">
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Manager Name
+            </label>
+            <Input
+              value={mgrNameDraft}
+              onChange={(e) => setMgrNameDraft(e.target.value)}
+              placeholder="Manager name"
+              className="h-9 bg-card"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Manager Description / Personality
+            </label>
+            <Textarea
+              value={mgrDescDraft}
+              onChange={(e) => setMgrDescDraft(e.target.value)}
+              placeholder="Negotiation personality and trading tendencies…"
+              className="min-h-[72px] bg-card"
+            />
+          </div>
+        </div>
+        <div className="mt-3 flex items-center gap-3">
+          <Button size="sm" variant="secondary" onClick={saveManager} disabled={!mgrDirty || !mgrNameDraft.trim()}>
+            SAVE MANAGER
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Edits the AI manager used by the Negotiation Suite. Kept separate from the player roster below.
+          </p>
+        </div>
+      </div>
+
       {/* Formation pitch */}
+
       <div className="mb-6 rounded-xl border border-border bg-card/60 p-4 shadow-lg">
         <div className="mb-3 flex flex-wrap items-end gap-3">
           <div>
