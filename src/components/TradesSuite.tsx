@@ -21,6 +21,14 @@ export function TradesSuite() {
   const inWindow = state.currentWeek <= lastWindowWeek;
   const [showAll, setShowAll] = useState(false);
 
+  // Deals touching a user-controlled (exempt) club are handled in the
+  // Negotiation Suite. The automatic desk here shows pure AI-vs-AI deals only.
+  const exemptList = state.settings?.contractExemptTeams ?? [];
+  const autoProposals = useMemo(
+    () => state.tradeProposals.filter((t) => !exemptList.includes(t.teamA) && !exemptList.includes(t.teamB)),
+    [state.tradeProposals, exemptList.join("|")]
+  );
+
 
   function acceptProposal(t: TradeProposal) {
     const reason = tradeBlockReason(state, t.teamA, t.teamB, [t.aSends], [t.bSends], t.cashAReceives, t.cashBReceives);
