@@ -206,6 +206,39 @@ export function syncStarters(team: LeagueTeam): LeagueTeam {
   };
 }
 
+// Mark a player as out (injured/suspended): remember the formation slot they
+// were starting in (or -1 if they were a bench player) and vacate that slot so
+// a replacement can be slotted in. The reservation is captured only once, on the
+// first match/edit that benches them, so chained cards don't overwrite it.
+export function markReserved(team: LeagueTeam, playerName: string): LeagueTeam {
+  const slot = team.lineup.indexOf(playerName);
+  const players = team.players.map((p) => {
+    if (p.name !== playerName) return p;
+    if (p.reservedSlot != null) return p; // reservation already captured
+    return { ...p, reservedSlot: slot >= 0 ? slot : -1 };
+  });
+  const lineup = slot >= 0 ? team.lineup.map((n, i) => (i === slot ? "" : n)) : team.lineup;
+  return syncStarters({ ...team, players, lineup });
+}
+
+// Restore a recovered player to the exact slot they held before going out. If
+// that slot is now occupied by a replacement, the replacement is bumped to the
+// bench. Bench players (reservedSlot === -1) simply return to the bench.
+export function restoreReserved(team: LeagueTeam, playerName: string): LeagueTeam {
+  const player = team.players.find((p) => p.name === playerName);
+  const slot = player?.reservedSlot ?? null;
+  let lineup = team.lineup;
+  if (slot != null && slot >= 0 && slot < lineup.length) {
+    lineup = lineup.map((n) => (n === playerName ? "" : n)); // avoid duplicates
+    lineup = lineup.map((n, i) => (i === slot ? playerName : n));
+  }
+  const players = team.players.map((p) =>
+    p.name === playerName ? { ...p, reservedSlot: null } : p
+  );
+  return syncStarters({ ...team, players, lineup });
+}
+
+
 export function blankPlayer(): LeaguePlayer {
   const base: LeaguePlayer = {
     name: "New Player", position: "CM", starter: false,
