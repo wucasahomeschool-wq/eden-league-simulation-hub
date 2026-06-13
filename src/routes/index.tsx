@@ -40,6 +40,7 @@ const SUITES = [
   { name: "League Standings", render: () => <StandingsSuite /> },
   { name: "Team Editor", render: () => <TeamEditorSuite /> },
   { name: "Trades", render: () => <TradesSuite /> },
+  { name: "Negotiation", render: () => <NegotiationSuite /> },
   { name: "Simulation Terminal", render: () => <SimulationTerminal /> },
   { name: "Playoffs", render: () => <PlayoffsSuite /> },
   { name: "Contracts", render: () => <ContractsSuite /> },
@@ -58,6 +59,7 @@ function Hub() {
 
   return (
     <div className="min-h-screen">
+      <ManagerGenerationWatcher />
       <header className="sticky top-0 z-40 border-b bg-card/90 backdrop-blur">
         <div className="h-1 w-full" style={{ backgroundImage: "var(--gradient-rb)" }} />
         <div className="mx-auto max-w-6xl px-4 py-3">
