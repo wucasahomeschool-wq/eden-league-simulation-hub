@@ -937,9 +937,16 @@ function moveTrade(
   const cap = prev.salaryCap ?? Infinity;
   const aOver = payrollOf(aTeam) > cap + 0.001 && payrollOf(aTeam) > payrollOf(teamA) + 0.001;
   const bOver = payrollOf(bTeam) > cap + 0.001 && payrollOf(bTeam) > payrollOf(teamB) + 0.001;
-  if (aOver || bOver) return prev;
+  if (aOver || bOver) {
+    drainSackedTeams(); // discard any events recorded for this rejected deal
+    return prev;
+  }
 
-  return { ...prev, teams: { ...prev.teams, [aName]: aTeam, [bName]: bTeam } };
+  return {
+    ...prev,
+    teams: { ...prev.teams, [aName]: aTeam, [bName]: bTeam },
+    managers: withPendingSacks(prev.managers),
+  };
 }
 
 // Offseason aging for one club (no automatic retirement — removals are manual).
