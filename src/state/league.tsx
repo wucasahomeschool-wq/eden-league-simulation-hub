@@ -896,28 +896,36 @@ function autoPromote(team: LeagueTeam, incoming: LeaguePlayer[]): LeagueTeam {
   return { ...team, lineup };
 }
 
-// Backfill any empty starting slots with the best available healthy reserve so a
-// club is never left a man short after a departure (trade-away, release). GK
-// slots prefer a goalkeeper; outfield slots take the highest-rated healthy bench
-// player. Complements autoPromote, which only ever brings incoming players in.
-function fillEmptyStarterSlots(team: LeagueTeam): LeagueTeam {
-  if (!team.lineup.includes("")) return team;
+// Repair a lineup so it never references a missing player or leaves a hole. First
+// drops "ghost" names no longer on the roster (released / removed / traded-away),
+// then backfills every empty starting slot with the best available healthy
+// reserve so a club is never left a man short. GK slots prefer a goalkeeper;
+// outfield slots take the highest-rated healthy bench player. Re-syncs starter
+// flags before returning.
+function repairLineup(team: LeagueTeam): LeagueTeam {
   const slots = buildLineupSlots(team.formation);
-  const lineup = [...team.lineup];
-  const used = new Set(lineup.filter(Boolean));
-  const ranked = [...team.players].sort((a, b) => b.rating - a.rating);
-  slots.forEach((slot, i) => {
-    if (lineup[i]) return;
-    let pick: LeaguePlayer | undefined;
-    if (slot.group === "GK") {
-      pick = ranked.find(
-        (p) => !used.has(p.name) && !isPlayerOut(p) && positionGroup(p.position) === "GK"
-      );
-    }
-    if (!pick) pick = ranked.find((p) => !used.has(p.name) && !isPlayerOut(p));
-    if (pick) { used.add(pick.name); lineup[i] = pick.name; }
+  const roster = new Set(team.players.map((p) => p.name));
+  // Align length to the formation and strip references to absent players.
+  const lineup = slots.map((_, i) => {
+    const n = team.lineup[i] ?? "";
+    return n && roster.has(n) ? n : "";
   });
-  return { ...team, lineup };
+  if (lineup.includes("")) {
+    const used = new Set(lineup.filter(Boolean));
+    const ranked = [...team.players].sort((a, b) => b.rating - a.rating);
+    slots.forEach((slot, i) => {
+      if (lineup[i]) return;
+      let pick: LeaguePlayer | undefined;
+      if (slot.group === "GK") {
+        pick = ranked.find(
+          (p) => !used.has(p.name) && !isPlayerOut(p) && positionGroup(p.position) === "GK"
+        );
+      }
+      if (!pick) pick = ranked.find((p) => !used.has(p.name) && !isPlayerOut(p));
+      if (pick) { used.add(pick.name); lineup[i] = pick.name; }
+    });
+  }
+  return syncStarters({ ...team, lineup });
 }
 
 // Drain any manager sacks recorded during the just-applied morale events and
