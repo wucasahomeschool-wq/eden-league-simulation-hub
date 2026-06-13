@@ -337,6 +337,7 @@ export function initState(): LeagueState {
     currentWeek: 1, season: 1, teamOrder, teams: capTeams, fixtures,
     results: {}, payloads: {}, tradeProposals: [], undoStack: [], redoStack: [],
     salaryCap, freeAgents: [], contractsInitialized: true,
+    managers: buildManagers(teamOrder),
     settings: { ...DEFAULT_SETTINGS, contractExemptTeams: [...DEFAULT_SETTINGS.contractExemptTeams] },
   };
 }
