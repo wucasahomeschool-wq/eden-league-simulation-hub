@@ -979,9 +979,10 @@ function moveTrade(
     players: teamB.players.filter((p) => !bSet.has(p.name)).concat(movingFromA),
   };
 
-  // Auto-promote upgrades into the lineup.
-  aTeam = autoPromote(aTeam, movingFromB);
-  bTeam = autoPromote(bTeam, movingFromA);
+  // Auto-promote upgrades into the lineup, then backfill any slots left empty by
+  // departing starters with the best healthy reserve (never field a man short).
+  aTeam = fillEmptyStarterSlots(autoPromote(aTeam, movingFromB));
+  bTeam = fillEmptyStarterSlots(autoPromote(bTeam, movingFromA));
 
   // Team morale: market triumph for both; asset depletion when sending without
   // receiving a player back.
