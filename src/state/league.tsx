@@ -1106,7 +1106,11 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       if (!error && data) {
         versionRef.current = data.version ?? 1;
         applyingRemoteRef.current = true;
-        setState((prev) => normalize({ ...(data.data as unknown as LeagueState), undoStack: prev.undoStack, redoStack: prev.redoStack }));
+        try {
+          setState((prev) => normalize({ ...(data.data as unknown as LeagueState), undoStack: prev.undoStack, redoStack: prev.redoStack }));
+        } catch {
+          applyingRemoteRef.current = false; // corrupt Cloud row — keep local state rather than crash
+        }
       } else {
         // No shared league yet — seed it from whatever this browser currently has.
         setState((prev) => {
