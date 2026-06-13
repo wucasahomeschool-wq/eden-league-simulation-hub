@@ -880,6 +880,7 @@ function autoPromote(team: LeagueTeam, incoming: LeaguePlayer[]): LeagueTeam {
   const slots = buildLineupSlots(team.formation);
   const lineup = [...team.lineup];
   for (const inc of incoming) {
+    if (isPlayerOut(inc)) continue; // injured/suspended arrivals start on the bench
     if (lineup.includes(inc.name)) continue; // already starting
     const targetGroup: LineupSlot["group"] = positionGroup(inc.position) === "GK" ? "GK" : "OUT";
     let worstIdx = -1;
