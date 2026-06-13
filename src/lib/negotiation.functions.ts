@@ -65,21 +65,32 @@ function extractJson<T>(content: string): T | null {
 }
 
 async function callGateway(apiKey: string, system: string, user: string) {
-  const res = await fetch(GATEWAY, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      temperature: 0.9,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-    }),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30_000);
+  let res: Response;
+  try {
+    res = await fetch(GATEWAY, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        temperature: 0.9,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") throw new Error("AI request timed out");
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
   if (res.status === 429) throw new Error("RATE_LIMIT");
   if (res.status === 402) throw new Error("CREDITS");
   if (!res.ok) {
