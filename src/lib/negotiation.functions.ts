@@ -150,17 +150,10 @@ export const negotiateTrade = createServerFn({ method: "POST" })
       `Reply now as ${data.managerName}, in JSON only.`,
     ].join("\n");
 
-    const content = await callGateway(apiKey, system, user, true);
-    let reply = content;
-    let accepts = false;
-    try {
-      const parsed = JSON.parse(content) as { reply?: string; accepts?: boolean };
-      if (typeof parsed.reply === "string") reply = parsed.reply;
-      accepts = parsed.accepts === true;
-    } catch {
-      // Fall back to raw text; never auto-accept on a parse failure.
-      accepts = false;
-    }
+    const content = await callGateway(apiKey, system, user);
+    const parsed = extractJson<{ reply?: string; accepts?: boolean }>(content);
+    let reply = parsed && typeof parsed.reply === "string" ? parsed.reply : content;
+    const accepts = parsed?.accepts === true;
     if (!reply.trim()) reply = "…";
     return { reply: reply.trim(), accepts };
   });
