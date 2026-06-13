@@ -197,6 +197,9 @@ function PlayoffManualDialog({
 }) {
   const [h, setH] = useState("0");
   const [a, setA] = useState("0");
+  // Reset the score inputs whenever a different match is opened, so stale scores
+  // from a previous entry never carry over.
+  useEffect(() => { setH("0"); setA("0"); }, [match?.id]);
   const tie = (parseInt(h) || 0) === (parseInt(a) || 0);
   return (
     <Dialog open={!!match} onOpenChange={(o) => !o && onClose()}>
