@@ -274,11 +274,11 @@ export function generateTradeProposals(state: LeagueState): TradeProposal[] {
     }
   }
 
-  // Surface every deal above the utility threshold, best first (capped).
+  // Surface the best deals, ranked by combined utility (best first, capped).
+  // No utility threshold — the Trade Suite shows the top deals and lets the
+  // user reveal more lower-ranked deals on demand.
   deals.sort((a, b) => b.deltaUA + b.deltaUB - (a.deltaUA + a.deltaUB));
-  return deals
-    .filter((d) => d.deltaUA + d.deltaUB >= settings.utilityThreshold)
-    .slice(0, MAX_SURFACED);
+  return deals.slice(0, MAX_SURFACED);
 }
 
 // ---------------- 5. Pre-flight validation (shared by manual + accept) ----------------

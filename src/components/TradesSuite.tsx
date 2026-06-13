@@ -10,12 +10,17 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 
+const TOP_COUNT = 5;
+
+
 const NONE = "__none__";
 
 export function TradesSuite() {
   const { state, executeTrade, executeManualTrade, declineTrade, refreshTradeProposals } = useLeague();
   const lastWindowWeek = state.settings?.transferWindowLastWeek ?? TRANSFER_WINDOW_LAST_WEEK;
   const inWindow = state.currentWeek <= lastWindowWeek;
+  const [showAll, setShowAll] = useState(false);
+
 
   function acceptProposal(t: TradeProposal) {
     const reason = tradeBlockReason(state, t.teamA, t.teamB, [t.aSends], [t.bSends], t.cashAReceives, t.cashBReceives);
@@ -48,8 +53,8 @@ export function TradesSuite() {
           <div>
             <h2 className="text-base font-extrabold uppercase tracking-wide">Automatic Trade Desk</h2>
             <p className="text-xs text-muted-foreground">
-              The market engine scans all 24 clubs each match week and surfaces every deal whose
-              combined utility clears the quality threshold — not a fixed count.{" "}
+              The market engine scans all 24 clubs each match week and ranks the best deals — the
+              top {TOP_COUNT} are shown first, with the option to reveal more lesser trades.{" "}
               {inWindow ? "Transfer window OPEN." : `Window closed (reopens next season, runs through Week ${lastWindowWeek}).`}
             </p>
           </div>
@@ -60,20 +65,31 @@ export function TradesSuite() {
 
         {state.tradeProposals.length === 0 ? (
           <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
-            No proposals clear the utility threshold right now. Deals are generated automatically each
-            week, or run the engine now.
+            No proposals available right now. Deals are generated automatically each week, or run the
+            engine now.
           </div>
         ) : (
-          <div className="space-y-3">
-            {state.tradeProposals.map((t) => (
-              <ProposalCard
-                key={t.id}
-                t={t}
-                onAccept={() => acceptProposal(t)}
-                onDecline={() => declineTrade(t.id)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="space-y-3">
+              {(showAll ? state.tradeProposals : state.tradeProposals.slice(0, TOP_COUNT)).map((t) => (
+                <ProposalCard
+                  key={t.id}
+                  t={t}
+                  onAccept={() => acceptProposal(t)}
+                  onDecline={() => declineTrade(t.id)}
+                />
+              ))}
+            </div>
+            {state.tradeProposals.length > TOP_COUNT && (
+              <div className="mt-3 flex justify-center">
+                <Button size="sm" variant="outline" onClick={() => setShowAll((v) => !v)} className="font-semibold">
+                  {showAll
+                    ? "SHOW LESS"
+                    : `SHOW MORE (${state.tradeProposals.length - TOP_COUNT} MORE DEALS)`}
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </section>
 
@@ -94,16 +110,16 @@ function ProposalCard({
   return (
     <div className="rounded-xl border bg-card p-4">
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-lg border bg-panel/40 p-3">
-          <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t.teamA}</div>
+        <div className="rounded-lg border border-highlight-blue/40 bg-highlight-blue/5 p-3">
+          <div className="text-xs font-bold uppercase tracking-wide text-highlight-blue">{t.teamA}</div>
           <p className="mt-1 text-sm">
             Sends <span className="font-semibold">{t.aSends}</span>
             {t.cashBReceives > 0 && <> + <span className="font-mono">${t.cashBReceives}M</span></>}
           </p>
           <p className="mt-1 text-[11px] font-mono text-success">Utility +{t.deltaUA}</p>
         </div>
-        <div className="rounded-lg border bg-panel/40 p-3">
-          <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t.teamB}</div>
+        <div className="rounded-lg border border-highlight-red/40 bg-highlight-red/5 p-3">
+          <div className="text-xs font-bold uppercase tracking-wide text-highlight-red">{t.teamB}</div>
           <p className="mt-1 text-sm">
             Sends <span className="font-semibold">{t.bSends}</span>
             {t.cashAReceives > 0 && <> + <span className="font-mono">${t.cashAReceives}M</span></>}
