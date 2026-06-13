@@ -111,6 +111,9 @@ export interface LeagueState {
   payloads: Record<string, MatchPayload>; // keyed by fixture / playoff match id
   playoffs?: PlayoffsState;
   tradeProposals: TradeProposal[];
+  // Per-club manager identity + negotiation personality. User-controlled
+  // (contract-exempt) clubs carry the "USER CONTROLLED" personality.
+  managers: Record<string, ManagerRecord>;
   undoStack: string[]; // serialized prior states (universal undo)
   redoStack: string[]; // serialized undone states (universal redo)
   salaryCap: number; // league-wide hard salary cap ($M)
