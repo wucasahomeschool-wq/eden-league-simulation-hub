@@ -36,6 +36,7 @@ function weightedChoice<T>(population: T[], weights: number[]): T {
   return population[population.length - 1];
 }
 function mean(arr: number[]): number {
+  if (arr.length === 0) return 0; // guard against divide-by-zero (NaN) on empty rosters
   return arr.reduce((s, v) => s + v, 0) / arr.length;
 }
 

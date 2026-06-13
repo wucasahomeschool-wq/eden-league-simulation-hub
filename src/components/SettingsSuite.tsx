@@ -231,9 +231,17 @@ function NumberSetting({
 
   function commit() {
     setEditing(false);
-    const v = parseFloat(draft);
-    if (!Number.isNaN(v)) onCommit(v);
-    else setDraft(String(value));
+    let v = parseFloat(draft);
+    if (!Number.isNaN(v)) {
+      // Clamp to the field's declared bounds so invalid values (e.g. morale 200,
+      // or an inverted demand min/max) can never be committed.
+      if (min != null) v = Math.max(min, v);
+      if (max != null) v = Math.min(max, v);
+      onCommit(v);
+      setDraft(String(v));
+    } else {
+      setDraft(String(value));
+    }
   }
 
   return (

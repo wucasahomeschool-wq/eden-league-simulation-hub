@@ -944,7 +944,8 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
 
   // Persist the live league document to Cloud (undo history is kept local only).
   function pushToCloud(snapshot: LeagueState) {
-    const nextVersion = versionRef.current + 1;
+    const prevVersion = versionRef.current;
+    const nextVersion = prevVersion + 1;
     const { undoStack: _ignore, redoStack: _ignore2, ...rest } = snapshot;
     const data = { ...rest, undoStack: [], redoStack: [] };
     versionRef.current = nextVersion;
@@ -953,7 +954,13 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       .from("league_state")
       .upsert({ id: CLOUD_ROW_ID, data: data as unknown as Record<string, unknown>, version: nextVersion, updated_at: new Date().toISOString() } as never)
       .then(({ error }) => {
-        if (error) console.warn("[league] cloud save failed", error.message);
+        if (error) {
+          console.warn("[league] cloud save failed", error.message);
+          // Roll back the optimistic version bump so a FAILED write doesn't leave
+          // versionRef ahead of Cloud — otherwise later remote updates look "stale"
+          // and get silently ignored. Only roll back if no newer write intervened.
+          if (versionRef.current === nextVersion) versionRef.current = prevVersion;
+        }
       });
   }
 
@@ -1057,6 +1064,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       const returning: string[] = [];
       const players = t.players.map((p) => {
         let np = p;
+        let returnedThisWeek = false;
         if (!protectedKeys.has(`${name}::${p.name}`) && (p.injuryWeeks > 0 || p.suspensionWeeks > 0)) {
           const wasOut = p.injuryWeeks > 0 || p.suspensionWeeks > 0;
           np = {
@@ -1068,10 +1076,13 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
           if (wasOut && np.injuryWeeks === 0 && np.suspensionWeeks === 0) {
             np = { ...np, morale: clampMorale(np.morale + 15) };
             returning.push(np.name);
+            returnedThisWeek = true;
           }
         }
         // Weekly selection / bench morale (player micro-events skip exempt clubs).
-        if (!exempt && np.injuryWeeks === 0 && np.suspensionWeeks === 0) {
+        // Skip on the comeback week so a returning player isn't double-counted
+        // (the +15 comeback bonus already covers that week).
+        if (!exempt && !returnedThisWeek && np.injuryWeeks === 0 && np.suspensionWeeks === 0) {
           const delta = inLineup.has(np.name) ? 5 : -10;
           np = { ...np, morale: clampMorale(np.morale + delta) };
         }
