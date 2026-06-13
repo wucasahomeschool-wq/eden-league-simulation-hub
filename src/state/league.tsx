@@ -1597,6 +1597,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         const fa = (prev.freeAgents ?? []).find((p) => p.name === freeAgentName);
         if (!fa) return prev;
         const t = prev.teams[team];
+        if (t.players.some((p) => p.name === freeAgentName)) return prev; // already on this roster — no duplicate
         const signing: LeaguePlayer = {
           ...fa, starter: false,
           salary: calculateMarketValue(fa.rating), contractYears: 1,
