@@ -1547,10 +1547,11 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         const { teams } = applyMatchEffects(
           prev.teams, payload, payload?.injuries, prev.currentWeek
         );
-        // Apply match morale just like the regular season so playoff form counts.
-        const moraleTeams = applyMatchMorale(
-          teams, preStandings, matchObj.home, matchObj.away, homeGoals, awayGoals, payload
-        );
+        // Apply match morale just like the regular season so playoff form counts
+        // (guarded so a bye/placeholder match without two real clubs is skipped).
+        const moraleTeams = prev.teams[matchObj.home] && prev.teams[matchObj.away]
+          ? applyMatchMorale(teams, preStandings, matchObj.home, matchObj.away, homeGoals, awayGoals, payload)
+          : teams;
         const rounds = prev.playoffs.rounds.map((round) =>
           round.map((m) =>
             m.id === matchId ? { ...m, result: { homeGoals, awayGoals, method } } : m
