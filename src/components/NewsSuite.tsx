@@ -21,6 +21,7 @@ export function NewsSuite() {
   const [tab, setTab] = useState<Tab>("postgame");
   const [fixtureId, setFixtureId] = useState<string>("");
   const [week, setWeek] = useState<number>(0);
+  const [focus, setFocus] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [article, setArticle] = useState<string | null>(null);
