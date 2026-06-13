@@ -21,6 +21,14 @@ export function TradesSuite() {
   const inWindow = state.currentWeek <= lastWindowWeek;
   const [showAll, setShowAll] = useState(false);
 
+  // Deals touching a user-controlled (exempt) club are handled in the
+  // Negotiation Suite. The automatic desk here shows pure AI-vs-AI deals only.
+  const exemptList = state.settings?.contractExemptTeams ?? [];
+  const autoProposals = useMemo(
+    () => state.tradeProposals.filter((t) => !exemptList.includes(t.teamA) && !exemptList.includes(t.teamB)),
+    [state.tradeProposals, exemptList.join("|")]
+  );
+
 
   function acceptProposal(t: TradeProposal) {
     const reason = tradeBlockReason(state, t.teamA, t.teamB, [t.aSends], [t.bSends], t.cashAReceives, t.cashBReceives);
@@ -63,15 +71,15 @@ export function TradesSuite() {
           </Button>
         </div>
 
-        {state.tradeProposals.length === 0 ? (
+        {autoProposals.length === 0 ? (
           <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
             No proposals available right now. Deals are generated automatically each week, or run the
-            engine now.
+            engine now. Deals involving your clubs appear in the Negotiation suite.
           </div>
         ) : (
           <>
             <div className="space-y-3">
-              {(showAll ? state.tradeProposals : state.tradeProposals.slice(0, TOP_COUNT)).map((t) => (
+              {(showAll ? autoProposals : autoProposals.slice(0, TOP_COUNT)).map((t) => (
                 <ProposalCard
                   key={t.id}
                   t={t}
@@ -80,18 +88,19 @@ export function TradesSuite() {
                 />
               ))}
             </div>
-            {state.tradeProposals.length > TOP_COUNT && (
+            {autoProposals.length > TOP_COUNT && (
               <div className="mt-3 flex justify-center">
                 <Button size="sm" variant="outline" onClick={() => setShowAll((v) => !v)} className="font-semibold">
                   {showAll
                     ? "SHOW LESS"
-                    : `SHOW MORE (${state.tradeProposals.length - TOP_COUNT} MORE DEALS)`}
+                    : `SHOW MORE (${autoProposals.length - TOP_COUNT} MORE DEALS)`}
                 </Button>
               </div>
             )}
           </>
         )}
       </section>
+
 
       {/* MANUAL SECTION */}
       <section>

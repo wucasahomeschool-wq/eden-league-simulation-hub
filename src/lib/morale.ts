@@ -3,7 +3,19 @@
 // Individual Player Morale (0–100, baseline 50), drives a dynamic event matrix,
 // scales match-simulation weights, and triggers AI managerial sackings.
 import type { LeaguePlayer, LeagueTeam } from "@/state/league";
-import { settings, isManualSimTeam } from "@/lib/engine-settings";
+import { settings, isManualSimTeam, isContractExempt } from "@/lib/engine-settings";
+
+// ---------------- Manager sack registry ----------------
+// triggerManagerSack records the clubs whose manager was dismissed during the
+// current state update. The state layer drains this immediately afterward to
+// queue an AI-generated replacement manager. User-controlled (contract-exempt)
+// clubs are never sacked, so they never appear here.
+let sackedTeams: string[] = [];
+export function drainSackedTeams(): string[] {
+  const out = sackedTeams;
+  sackedTeams = [];
+  return out;
+}
 
 // Manual score-entry clubs bypass player-level micro events (their match
 // details are never simulated). Team-level macro events still apply to them.
@@ -84,13 +96,19 @@ export function applyTeamEvent(team: LeagueTeam, event: TeamEvent): boolean {
 // Rather than snapping morale to a flat number, the squad recovers part of the
 // way toward the renewal target (a fresh start lifts spirits but doesn't erase
 // a bad run overnight).
+//
+// User-controlled (contract-exempt) clubs are NEVER sacked — their manager,
+// tactics, and morale are left entirely under the user's control.
 export function triggerManagerSack(team: LeagueTeam): void {
+  if (isContractExempt(team.name)) return;
   const options = TACTICS.filter((t) => t !== team.tactical_style);
   team.tactical_style = options[Math.floor(Math.random() * options.length)];
   const current = team.morale ?? settings.moraleBaseline;
   const target = settings.managerRenewalMorale;
   // Halfway recovery toward the target, guaranteeing at least a small lift.
   team.morale = clampMorale(Math.max(current + 8, Math.round((current + target) / 2)));
+  // Record the dismissal so the state layer can queue an AI replacement.
+  sackedTeams.push(team.name);
 }
 
 // Apply a player micro event in place. Exempt clubs ignore player events.

@@ -11,8 +11,9 @@ import { buildMatchPayload, type MatchPayload } from "@/lib/match-payload";
 import type { VersionData } from "@/lib/league-export";
 import {
   applyTeamEvent, applyPlayerEvent, moraleScaledAttrs, MORALE_BASELINE,
-  clampMorale, carryOverMorale,
+  clampMorale, carryOverMorale, drainSackedTeams,
 } from "@/lib/morale";
+import { buildManagers, type ManagerRecord } from "@/data/managers";
 import {
   generateTradeProposals, parseBudget, formatBudget, type TradeProposal,
 } from "@/lib/trades";
@@ -110,6 +111,9 @@ export interface LeagueState {
   payloads: Record<string, MatchPayload>; // keyed by fixture / playoff match id
   playoffs?: PlayoffsState;
   tradeProposals: TradeProposal[];
+  // Per-club manager identity + negotiation personality. User-controlled
+  // (contract-exempt) clubs carry the "USER CONTROLLED" personality.
+  managers: Record<string, ManagerRecord>;
   undoStack: string[]; // serialized prior states (universal undo)
   redoStack: string[]; // serialized undone states (universal redo)
   salaryCap: number; // league-wide hard salary cap ($M)
@@ -333,6 +337,7 @@ export function initState(): LeagueState {
     currentWeek: 1, season: 1, teamOrder, teams: capTeams, fixtures,
     results: {}, payloads: {}, tradeProposals: [], undoStack: [], redoStack: [],
     salaryCap, freeAgents: [], contractsInitialized: true,
+    managers: buildManagers(teamOrder),
     settings: { ...DEFAULT_SETTINGS, contractExemptTeams: [...DEFAULT_SETTINGS.contractExemptTeams] },
   };
 }
@@ -387,6 +392,13 @@ function normalize(state: LeagueState): LeagueState {
   // Merge persisted tuning knobs into the live engine singleton so every
   // engine immediately reads the current values (any load path hits normalize).
   const mergedSettings = applySettings(state.settings);
+  // Managers: keep any already-persisted manager identities, seed defaults for
+  // clubs that don't have one yet (older saves, newly added teams).
+  const seededManagers = buildManagers(state.teamOrder);
+  const managers: Record<string, ManagerRecord> = {};
+  for (const name of state.teamOrder) {
+    managers[name] = state.managers?.[name] ?? seededManagers[name];
+  }
   return {
     ...state,
     season: state.season ?? 1,
@@ -398,6 +410,7 @@ function normalize(state: LeagueState): LeagueState {
     salaryCap,
     freeAgents: state.freeAgents ?? [],
     contractsInitialized,
+    managers,
     settings: { ...mergedSettings, contractExemptTeams: [...mergedSettings.contractExemptTeams] },
   };
 }
@@ -796,6 +809,7 @@ interface LeagueContextValue {
   executeManualTrade: (teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashAReceives: number, cashBReceives: number) => void;
   declineTrade: (proposalId: string) => void;
   refreshTradeProposals: () => void;
+  replaceManager: (team: string, manager: { name: string; personality: string }) => void;
   setSalary: (team: string, index: number, salary: number) => void;
   setContractYears: (team: string, index: number, years: number) => void;
   signFreeAgent: (team: string, freeAgentName: string) => void;
@@ -827,6 +841,23 @@ function autoPromote(team: LeagueTeam, incoming: LeaguePlayer[]): LeagueTeam {
     if (worstIdx >= 0 && inc.rating > worstRating) lineup[worstIdx] = inc.name;
   }
   return { ...team, lineup };
+}
+
+// Drain any manager sacks recorded during the just-applied morale events and
+// queue AI-generated replacements (pendingGeneration). Returns the updated
+// managers map (unchanged reference when nothing was sacked).
+function withPendingSacks(managers: Record<string, ManagerRecord>): Record<string, ManagerRecord> {
+  const sacked = drainSackedTeams();
+  if (sacked.length === 0) return managers;
+  const next = { ...managers };
+  for (const name of sacked) {
+    next[name] = {
+      name: "Interim Manager",
+      personality: "A caretaker manager holding the fort until a permanent appointment.",
+      pendingGeneration: true,
+    };
+  }
+  return next;
 }
 
 // Core multi-player trade: move named players + cash between two clubs, apply
@@ -907,9 +938,16 @@ function moveTrade(
   const cap = prev.salaryCap ?? Infinity;
   const aOver = payrollOf(aTeam) > cap + 0.001 && payrollOf(aTeam) > payrollOf(teamA) + 0.001;
   const bOver = payrollOf(bTeam) > cap + 0.001 && payrollOf(bTeam) > payrollOf(teamB) + 0.001;
-  if (aOver || bOver) return prev;
+  if (aOver || bOver) {
+    drainSackedTeams(); // discard any events recorded for this rejected deal
+    return prev;
+  }
 
-  return { ...prev, teams: { ...prev.teams, [aName]: aTeam, [bName]: bTeam } };
+  return {
+    ...prev,
+    teams: { ...prev.teams, [aName]: aTeam, [bName]: bTeam },
+    managers: withPendingSacks(prev.managers),
+  };
 }
 
 // Offseason aging for one club (no automatic retirement — removals are manual).
@@ -1133,6 +1171,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         const next: LeagueState = {
           ...prev,
           teams: moraleTeams,
+          managers: withPendingSacks(prev.managers),
           results: { ...prev.results, [fixtureId]: { homeGoals, awayGoals, method } },
           payloads: payload ? { ...prev.payloads, [fixtureId]: payload } : prev.payloads,
         };
@@ -1438,6 +1477,17 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       })),
     refreshTradeProposals: () =>
       update((prev) => ({ ...prev, tradeProposals: generateTradeProposals(prev) })),
+    replaceManager: (team, manager) =>
+      update((prev) => {
+        if (!prev.teams[team]) return prev;
+        return {
+          ...prev,
+          managers: {
+            ...prev.managers,
+            [team]: { name: manager.name, personality: manager.personality },
+          },
+        };
+      }),
     setSalary: (team, index, salary) =>
       update((prev) => {
         const players = prev.teams[team].players.map((p, i) =>

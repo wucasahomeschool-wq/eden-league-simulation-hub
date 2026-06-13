@@ -13,6 +13,8 @@ import { SettingsSuite } from "@/components/SettingsSuite";
 import { SaveVersionButton } from "@/components/SaveVersionButton";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { NewsSuite } from "@/components/NewsSuite";
+import { NegotiationSuite } from "@/components/NegotiationSuite";
+import { ManagerGenerationWatcher } from "@/components/ManagerGenerationWatcher";
 import { downloadLeagueExport } from "@/lib/league-export";
 import { Button } from "@/components/ui/button";
 import edenLogo from "@/assets/eden-league-logo.png.asset.json";
@@ -38,6 +40,7 @@ const SUITES = [
   { name: "League Standings", render: () => <StandingsSuite /> },
   { name: "Team Editor", render: () => <TeamEditorSuite /> },
   { name: "Trades", render: () => <TradesSuite /> },
+  { name: "Negotiation", render: () => <NegotiationSuite /> },
   { name: "Simulation Terminal", render: () => <SimulationTerminal /> },
   { name: "Playoffs", render: () => <PlayoffsSuite /> },
   { name: "Contracts", render: () => <ContractsSuite /> },
@@ -56,6 +59,7 @@ function Hub() {
 
   return (
     <div className="min-h-screen">
+      <ManagerGenerationWatcher />
       <header className="sticky top-0 z-40 border-b bg-card/90 backdrop-blur">
         <div className="h-1 w-full" style={{ backgroundImage: "var(--gradient-rb)" }} />
         <div className="mx-auto max-w-6xl px-4 py-3">

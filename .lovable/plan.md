@@ -1,46 +1,85 @@
-## Goal
+# Negotiation Suite — Plan
 
-Move the Eden League save from each browser's local storage into **Lovable Cloud** (a real backend database), so the entire league — game results, rosters, contracts, morale, playoffs, everything — lives in one shared place. Any window, device, or person opening the app sees the same up-to-date league, and changes propagate live between open windows. After the migration, run a full dry-run test of the **Match Scheduling**, **Playoffs**, and **Contracts** suites so you know they're ready before you finish the real season.
+A new, fully additive suite where you (the user-controlled teams) negotiate trades with the AI managers of other clubs. Each AI club has a distinct manager personality (from your uploaded file); the AI writes in-character replies to your offers and signals when a deal is agreed. Nothing about the simulation engine, contract engine, or existing trade math changes — this layer sits on top.
 
-## Why this fixes what you saw
+## Key decisions (locked in)
+- **User-controlled teams = the existing "exempt clubs" selector** (`contractExemptTeams`, currently `Gugu Team` + `Spams`). That one Settings control now drives both the contract engine AND negotiations. No new selector.
+- **Gugu Team & Spams** get the personality label `USER CONTROLLED` and are never given an AI manager.
+- **Negotiation chat is ephemeral** — lives in the session, resets on reload. No database changes.
 
-Today the league is stored only in your browser (`localStorage`). That's per-browser/per-device and is read once when a tab opens, so a second window never sees the first window's later changes — exactly the "only Week 1 showed up" behavior. Cloud storage replaces that with a single shared source of truth.
+## How trades route
+- The trade engine still scans all 24 clubs exactly as today.
+- **Trades Suite**: now shows only proposals where *neither* club is user-controlled (pure AI-vs-AI deals) — unchanged accept/decline behavior.
+- **Negotiation Suite**: shows proposals where *one* club is user-controlled. Instead of a one-click accept, you open a chat with that club's AI manager.
+- The Manual Trade Builder stays in the Trades Suite, untouched.
 
-## What changes
+## Negotiation flow
+1. Pick one of your user-controlled teams' pending proposals (or start a fresh offer against any AI club via a builder).
+2. Chat opens with the AI manager, who greets you in-character based on their personality.
+3. You send messages / offers (which players + cash each side gives). The AI replies in-character — haggling, countering, or rejecting per its personality and the real player values, budgets, and cap.
+4. When the manager agrees to the *current on-the-table terms*, an **INITIATE TRADE** button appears.
+5. INITIATE TRADE runs the exact same `executeManualTrade(...)` used by the Trades Suite (with the same `tradeBlockReason` pre-flight guard), so all roster/cap/budget rules are enforced identically.
 
-### 1. Enable Lovable Cloud
-Provision the backend so we have a database to store the league in. (No login screen is added — see the access note below.)
+The AI only ever *talks*. It never mutates league state. The trade is executed by existing, trusted code using the concrete terms shown on screen.
 
-### 2. One shared league record
-Create a single database table that holds the whole league as one JSON document (the same `LeagueState` object the app already uses), plus a timestamp and a version number. There is exactly one league row, shared by everyone.
+## Manager personalities & sacking
+- A new `managers` map is added to league state, seeded from your uploaded personality file for the 22 AI clubs; the 2 user clubs are `USER CONTROLLED`.
+- When an AI club's manager is sacked (existing morale mechanic), a fresh AI-generated manager (name + personality) replaces them via Lovable AI. User-controlled clubs are **never** sacked — their manager flag is protected.
+- All existing morale math stays identical; only the manager-identity swap is added.
 
-### 3. Rewire saving and loading
-- **On open:** the app loads the league from Cloud instead of local storage.
-- **On every change:** the app writes the updated league back to Cloud (debounced so rapid edits don't spam the database).
-- **First-time migration:** if the Cloud record is empty but your browser still has the current `eden_league_state_v6` save, the app uploads that existing save to Cloud once, so your in-progress season (results, roster changes) carries over and nothing is lost.
-- **Offline cache:** local storage is kept only as a read fallback if Cloud is briefly unreachable; Cloud stays the source of truth.
+```text
+Trade engine (unchanged)
+        │ generates proposals
+        ▼
+ ┌─────────────┬───────────────────────────┐
+ │ AI vs AI    │ involves a user team        │
+ ▼             ▼
+Trades Suite   Negotiation Suite ──chat──► AI manager (Lovable AI)
+(1-click)             │ deal agreed
+                      ▼
+              INITIATE TRADE → executeManualTrade() (shared)
+```
 
-### 4. Live multi-window sync
-Subscribe to realtime updates on the league record. When one window saves a change, other open windows update automatically — no refresh needed. To avoid two windows overwriting each other, saves use the version number so the latest write is applied cleanly.
+## Safety
+- Additive only: new suite, new server function, new data file, a new state field with a migration default. Existing suites keep working if the feature is ignored.
+- Trade routing is a display filter; execution reuses existing functions.
+- AI calls are isolated server-side (like the Newsroom). AI output is never trusted for state changes.
+- If Lovable AI is unavailable, negotiation shows a friendly error and the Trades Suite manual builder remains a full fallback.
 
-### 5. Undo stays local
-The Undo history (up to 1000 snapshots) is **not** pushed to the cloud — it would bloat every save. Undo keeps working within your current session; only the actual league state is synced.
-
-### 6. Verify the three locked suites
-After migration, run a temporary fast-forward on a throwaway copy of the data: auto-record a full season + Final Four + playoffs to a champion, then walk through Match Scheduling, Playoffs, and Contracts to confirm each unlocks and behaves correctly. Report results. Your real saved league is not touched by this test.
-
-## Access / security note
-
-Because there's no login, the shared league is readable and writable by anyone who has the app URL. That's the simplest setup and fine for a private group you trust with the link. If you'd later prefer a gate, I can add either a simple shared passphrase or full user login — say the word and I'll layer it on. (I'll flag this in the security memory so it isn't mistaken for an oversight.)
+---
 
 ## Technical details
 
-- **Table:** `public.league_state ( id text primary key default 'main', data jsonb not null, version bigint not null default 1, updated_at timestamptz default now() )`. Single row keyed `'main'`. Migration includes explicit GRANTs (anon + authenticated: select/insert/update; service_role: all) and an RLS policy allowing access to that row; table added to the realtime publication.
-- **`src/state/league.tsx`:** replace `loadState`/`saveState` localStorage calls with Supabase browser-client reads/writes against the single row. Keep `normalize()` and all migration logic. Strip `undoStack` before persisting to Cloud. Add a realtime subscription that merges incoming `data` into React state. Initial load becomes async (show the existing "Loading league state…" state until the first fetch resolves). First-run uploads any existing `localStorage` `eden_league_state_v6` blob when the Cloud row is absent.
-- **Writes:** debounced (~500ms) `update`/`upsert` with `version = version + 1`; realtime echo of our own write is ignored by comparing version.
-- **No schema/data changes to the engine, suites, or league rules** — this is purely the persistence layer plus the test pass.
+**1. Manager data — `src/data/managers.ts` (new)**
+Map of team name → `{ name: string; personality: string; userControlled?: boolean }`, transcribed from the uploaded PDF for 22 clubs; `Gugu Team` & `Spams` → `personality: "USER CONTROLLED"`.
 
-## Out of scope
-- User authentication / passphrase gating (offered above, not built unless you ask).
-- Per-user separate leagues — this is one shared league by design.
-- Any change to simulation math, trades, contracts, or UI behavior.
+**2. State — `src/state/league.tsx`**
+- Add `managers: Record<string, { name: string; personality: string; pendingGeneration?: boolean }>` to `LeagueState`.
+- Seed it in `createInitialState` and backfill in `normalize()` (so existing Cloud saves migrate). Persists automatically with the whole-state upsert.
+- New context action `replaceManager(team, manager)` (used after AI generation).
+- `triggerManagerSack` path: when an AI club is sacked, set its manager to an interim placeholder with `pendingGeneration: true`; guard so exempt/user teams are never sacked (manager untouched). Morale math unchanged.
+
+**3. Sacking guard — `src/lib/morale.ts` + `engine-settings.ts`**
+`triggerManagerSack(team)` early-returns the manager swap when `isContractExempt(team.name)` (reusing the existing live check). Tactical/morale numbers unchanged otherwise.
+
+**4. AI server functions — `src/lib/negotiation.functions.ts` (new)**, mirroring `news.functions.ts`:
+- `negotiateTrade`: inputs = manager personality, factual trade brief (real player names/ratings/values, both budgets, salary cap headroom), conversation history, and the user's latest message + current proposed terms. Returns `{ reply: string; accepts: boolean }`. System prompt forbids inventing players/stats and enforces in-character tone + the personality's trading tolerance.
+- `generateManager`: generates a new in-character `{ name, personality }` for a sacked AI club.
+- Both use the Lovable AI gateway (`google/gemini-3-flash-preview`) with the same 429/402 error handling as the Newsroom.
+
+**5. Fact brief — `src/lib/negotiation-brief.ts` (new)**
+Pure functions assembling the factual digest (players, `calculatePlayerValue`, budgets, cap) from real state — no fabricated numbers.
+
+**6. UI — `src/components/NegotiationSuite.tsx` (new)**
+- Lists pending proposals involving user teams; chat panel with markdown replies (`react-markdown`, already installed); offer builder (reuse the cascading player/cash pattern from `TradesSuite`).
+- On `accepts === true` for current terms, show **INITIATE TRADE** → runs `tradeBlockReason` then `executeManualTrade(...)`, toast on success.
+- A `useEffect` watches for managers with `pendingGeneration` and calls `generateManager`, then `replaceManager`.
+
+**7. Trades Suite filter — `src/components/TradesSuite.tsx`**
+Filter the auto-desk list to proposals where neither club `isContractExempt`. Manual builder unchanged.
+
+**8. Register suite — `src/routes/index.tsx`**
+Add `{ name: "Negotiation", render: () => <NegotiationSuite /> }` to the `SUITES` array.
+
+**9. Memory**
+Save a feature memory documenting: exempt selector = user-controlled teams, negotiation routing, AI manager personalities + sacking regeneration, ephemeral chat.
