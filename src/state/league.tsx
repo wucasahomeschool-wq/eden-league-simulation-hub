@@ -667,7 +667,13 @@ function applyMatchEffects(
         starter: false,
       }));
       protectedKeys.add(`${inj.team}::${inj.name}`);
+      outPlayers.push({ team: inj.team, name: inj.name });
     }
+  }
+
+  // Reserve each benched player's starting slot and vacate it for a replacement.
+  for (const out of outPlayers) {
+    if (next[out.team]) next[out.team] = markReserved(next[out.team], out.name);
   }
 
   return { teams: next, protectedKeys };
