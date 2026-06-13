@@ -62,7 +62,6 @@ async function callGateway(apiKey: string, system: string, user: string, jsonMod
     body: JSON.stringify({
       model: MODEL,
       temperature: 0.9,
-      ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
