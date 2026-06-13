@@ -1354,7 +1354,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       }),
     scheduleNewSeason: (entries) =>
       update((prev) => {
-        // Offseason: age all squads, run retirements, carry rosters/budgets/morale.
+        // Offseason: age all squads (no auto-retirement), carry rosters/budgets/morale.
         const season = prev.season + 1;
         const teams: Record<string, LeagueTeam> = {};
         for (const name of prev.teamOrder) {
