@@ -306,6 +306,7 @@ function normalize(state: LeagueState): LeagueState {
         ...p,
         injuryWeeks: p.injuryWeeks ?? 0,
         suspensionWeeks: p.suspensionWeeks ?? 0,
+        reservedSlot: p.reservedSlot ?? null,
         yellowLog: p.yellowLog ?? [],
         morale: p.morale ?? MORALE_BASELINE,
         age: p.age ?? 25,
