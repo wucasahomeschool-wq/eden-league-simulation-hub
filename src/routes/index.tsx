@@ -11,6 +11,7 @@ import { TradesSuite } from "@/components/TradesSuite";
 import { ContractsSuite } from "@/components/ContractsSuite";
 import { SettingsSuite } from "@/components/SettingsSuite";
 import { SaveVersionButton } from "@/components/SaveVersionButton";
+import { NotificationCenter } from "@/components/NotificationCenter";
 import { downloadLeagueExport } from "@/lib/league-export";
 import { Button } from "@/components/ui/button";
 import edenLogo from "@/assets/eden-league-logo.png.asset.json";
