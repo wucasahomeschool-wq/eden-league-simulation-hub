@@ -83,6 +83,9 @@ function Hub() {
             >
               ›
             </button>
+            <div className="absolute right-0 top-1/2 -translate-y-1/2">
+              <NotificationCenter />
+            </div>
           </div>
           <Toolbar />
         </div>
