@@ -1064,6 +1064,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       const returning: string[] = [];
       const players = t.players.map((p) => {
         let np = p;
+        let returnedThisWeek = false;
         if (!protectedKeys.has(`${name}::${p.name}`) && (p.injuryWeeks > 0 || p.suspensionWeeks > 0)) {
           const wasOut = p.injuryWeeks > 0 || p.suspensionWeeks > 0;
           np = {
@@ -1075,10 +1076,13 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
           if (wasOut && np.injuryWeeks === 0 && np.suspensionWeeks === 0) {
             np = { ...np, morale: clampMorale(np.morale + 15) };
             returning.push(np.name);
+            returnedThisWeek = true;
           }
         }
         // Weekly selection / bench morale (player micro-events skip exempt clubs).
-        if (!exempt && np.injuryWeeks === 0 && np.suspensionWeeks === 0) {
+        // Skip on the comeback week so a returning player isn't double-counted
+        // (the +15 comeback bonus already covers that week).
+        if (!exempt && !returnedThisWeek && np.injuryWeeks === 0 && np.suspensionWeeks === 0) {
           const delta = inLineup.has(np.name) ? 5 : -10;
           np = { ...np, morale: clampMorale(np.morale + delta) };
         }
