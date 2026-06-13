@@ -19,6 +19,8 @@ export function TradesSuite() {
   const { state, executeTrade, executeManualTrade, declineTrade, refreshTradeProposals } = useLeague();
   const lastWindowWeek = state.settings?.transferWindowLastWeek ?? TRANSFER_WINDOW_LAST_WEEK;
   const inWindow = state.currentWeek <= lastWindowWeek;
+  const [showAll, setShowAll] = useState(false);
+
 
   function acceptProposal(t: TradeProposal) {
     const reason = tradeBlockReason(state, t.teamA, t.teamB, [t.aSends], [t.bSends], t.cashAReceives, t.cashBReceives);
