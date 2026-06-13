@@ -36,15 +36,15 @@ export function buildPostgameBrief(state: LeagueState, fixtureId: string): strin
   const homeStyle = state.teams[payload.home]?.tactical_style ?? "?";
   const awayStyle = state.teams[payload.away]?.tactical_style ?? "?";
 
-  const gkLines = payload.goalkeepers
+  const gkLines = (payload.goalkeepers ?? [])
     .map(
       (g) =>
         `  - ${g.name} (${g.team}): conceded ${g.conceded}${g.cleanSheet ? ", CLEAN SHEET" : ""}`
     )
     .join("\n");
 
-  const injuries = payload.injuries.length
-    ? payload.injuries.map((i) => `  - ${i.name} (${i.team})`).join("\n")
+  const injuries = (payload.injuries ?? []).length
+    ? (payload.injuries ?? []).map((i) => `  - ${i.name} (${i.team})`).join("\n")
     : "  - None";
 
   return [
