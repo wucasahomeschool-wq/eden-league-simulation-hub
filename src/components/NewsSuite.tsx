@@ -154,8 +154,22 @@ export function NewsSuite() {
 
       {article && (
         <article className="rounded-xl border bg-card p-6 shadow-sm">
-          <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground/90 prose-strong:text-foreground">
-            <ReactMarkdown>{article}</ReactMarkdown>
+          <div className="space-y-3 text-foreground/90">
+            <ReactMarkdown
+              components={{
+                h2: ({ children }) => (
+                  <h2 className="text-xl font-extrabold tracking-tight text-foreground">{children}</h2>
+                ),
+                h1: ({ children }) => (
+                  <h2 className="text-xl font-extrabold tracking-tight text-foreground">{children}</h2>
+                ),
+                p: ({ children }) => <p className="leading-relaxed">{children}</p>,
+                strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+                em: ({ children }) => <em className="italic">{children}</em>,
+              }}
+            >
+              {article}
+            </ReactMarkdown>
           </div>
           <div className="mt-4 border-t pt-2 text-[10px] uppercase tracking-widest text-muted-foreground">
             Eden League Newsroom · AI-written from real league data · entertainment only
