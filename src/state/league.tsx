@@ -1452,14 +1452,20 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         };
       }),
     runContractCycle: () => {
-      const r = runCycle(state);
-      update(() => ({
-        ...state,
-        teams: r.teams,
-        freeAgents: r.freeAgents,
-        salaryCap: r.salaryCap,
-      }));
-      return r.actions;
+      // Run the cycle inside the functional updater against the freshest state
+      // (avoids the stale render-closure `state`), capturing the report to return.
+      let actions: ContractAction[] = [];
+      update((prev) => {
+        const r = runCycle(prev);
+        actions = r.actions;
+        return {
+          ...prev,
+          teams: r.teams,
+          freeAgents: r.freeAgents,
+          salaryCap: r.salaryCap,
+        };
+      });
+      return actions;
     },
     setSalaryCap: (cap) =>
       update((prev) => {
