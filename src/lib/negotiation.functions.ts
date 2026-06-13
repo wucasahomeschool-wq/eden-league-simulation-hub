@@ -162,9 +162,10 @@ export const negotiateTrade = createServerFn({ method: "POST" })
     ].join("\n");
 
     const content = await callGateway(apiKey, system, user);
-    const parsed = extractJson<{ reply?: string; accepts?: boolean }>(content);
+    const parsed = extractJson<{ reply?: string; accepts?: unknown }>(content);
     let reply = parsed && typeof parsed.reply === "string" ? parsed.reply : content;
-    const accepts = parsed?.accepts === true;
+    // Tolerate the model returning a stringy/numeric truthy value for accepts.
+    const accepts = parsed?.accepts === true || parsed?.accepts === "true" || parsed?.accepts === 1;
     if (!reply.trim()) reply = "…";
     return { reply: reply.trim(), accepts };
   });
