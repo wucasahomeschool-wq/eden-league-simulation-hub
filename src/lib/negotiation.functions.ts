@@ -187,14 +187,12 @@ export const generateManager = createServerFn({ method: "POST" })
       (data.tacticalStyle ? ` (they currently play a "${data.tacticalStyle}" style).` : ".") +
       ` Return JSON only.`;
 
-    const content = await callGateway(apiKey, "You are a creative sports-fiction writer.\n" + NEW_MANAGER_RULES, user, true);
-    try {
-      const parsed = JSON.parse(content) as { name?: string; personality?: string };
+    const content = await callGateway(apiKey, "You are a creative sports-fiction writer.\n" + NEW_MANAGER_RULES, user);
+    const parsed = extractJson<{ name?: string; personality?: string }>(content);
+    if (parsed) {
       const name = (parsed.name ?? "").trim();
       const personality = (parsed.personality ?? "").trim();
       if (name && personality) return { name, personality };
-    } catch {
-      // fall through to default
     }
     // Safe fallback so a sacked club always ends up with a usable manager.
     return {
