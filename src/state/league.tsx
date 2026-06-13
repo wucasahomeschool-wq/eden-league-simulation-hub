@@ -1134,7 +1134,11 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
           if (row.version <= versionRef.current) return; // stale
           versionRef.current = row.version;
           applyingRemoteRef.current = true;
-          setState((prev) => normalize({ ...(row.data as LeagueState), undoStack: prev.undoStack, redoStack: prev.redoStack }));
+          try {
+            setState((prev) => normalize({ ...(row.data as LeagueState), undoStack: prev.undoStack, redoStack: prev.redoStack }));
+          } catch {
+            applyingRemoteRef.current = false; // ignore a corrupt remote payload rather than crash
+          }
         }
       )
       .subscribe();
