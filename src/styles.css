@@ -41,6 +41,10 @@
   --color-panel: var(--panel);
   --color-console-bg: var(--console-bg);
   --color-console-fg: var(--console-fg);
+  --color-highlight-red: var(--highlight-red);
+  --color-highlight-red-foreground: var(--highlight-red-foreground);
+  --color-highlight-blue: var(--highlight-blue);
+  --color-highlight-blue-foreground: var(--highlight-blue-foreground);
 }
 
 :root {
