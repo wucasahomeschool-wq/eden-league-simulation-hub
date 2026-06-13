@@ -11,6 +11,7 @@ import { TradesSuite } from "@/components/TradesSuite";
 import { ContractsSuite } from "@/components/ContractsSuite";
 import { SettingsSuite } from "@/components/SettingsSuite";
 import { SaveVersionButton } from "@/components/SaveVersionButton";
+import { NotificationCenter } from "@/components/NotificationCenter";
 import { downloadLeagueExport } from "@/lib/league-export";
 import { Button } from "@/components/ui/button";
 import edenLogo from "@/assets/eden-league-logo.png.asset.json";
@@ -56,7 +57,7 @@ function Hub() {
       <header className="sticky top-0 z-40 border-b bg-card/90 backdrop-blur">
         <div className="h-1 w-full" style={{ backgroundImage: "var(--gradient-rb)" }} />
         <div className="mx-auto max-w-6xl px-4 py-3">
-          <div className="flex items-center gap-2">
+          <div className="relative flex items-center gap-2">
             <button
               onClick={prev}
               aria-label="Previous suite"
@@ -82,6 +83,9 @@ function Hub() {
             >
               ›
             </button>
+            <div className="absolute right-0 top-1/2 -translate-y-1/2">
+              <NotificationCenter />
+            </div>
           </div>
           <Toolbar />
         </div>
