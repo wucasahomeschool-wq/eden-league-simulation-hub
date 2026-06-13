@@ -1209,17 +1209,37 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       }),
     setInjuryWeeks: (team, index, weeks) =>
       update((prev) => {
-        const players = prev.teams[team].players.map((p, i) =>
-          i === index ? { ...p, injuryWeeks: Math.max(0, weeks) } : p
-        );
-        return { ...prev, teams: { ...prev.teams, [team]: { ...prev.teams[team], players } } };
+        const t = prev.teams[team];
+        const target = t.players[index];
+        if (!target) return prev;
+        const wasOut = target.injuryWeeks > 0 || target.suspensionWeeks > 0;
+        const willBeOut = Math.max(0, weeks) > 0 || target.suspensionWeeks > 0;
+        let team2: LeagueTeam = {
+          ...t,
+          players: t.players.map((p, i) =>
+            i === index ? { ...p, injuryWeeks: Math.max(0, weeks) } : p
+          ),
+        };
+        if (!wasOut && willBeOut) team2 = markReserved(team2, target.name);
+        else if (wasOut && !willBeOut) team2 = restoreReserved(team2, target.name);
+        return { ...prev, teams: { ...prev.teams, [team]: team2 } };
       }),
     setSuspensionWeeks: (team, index, weeks) =>
       update((prev) => {
-        const players = prev.teams[team].players.map((p, i) =>
-          i === index ? { ...p, suspensionWeeks: Math.max(0, weeks) } : p
-        );
-        return { ...prev, teams: { ...prev.teams, [team]: { ...prev.teams[team], players } } };
+        const t = prev.teams[team];
+        const target = t.players[index];
+        if (!target) return prev;
+        const wasOut = target.injuryWeeks > 0 || target.suspensionWeeks > 0;
+        const willBeOut = Math.max(0, weeks) > 0 || target.injuryWeeks > 0;
+        let team2: LeagueTeam = {
+          ...t,
+          players: t.players.map((p, i) =>
+            i === index ? { ...p, suspensionWeeks: Math.max(0, weeks) } : p
+          ),
+        };
+        if (!wasOut && willBeOut) team2 = markReserved(team2, target.name);
+        else if (wasOut && !willBeOut) team2 = restoreReserved(team2, target.name);
+        return { ...prev, teams: { ...prev.teams, [team]: team2 } };
       }),
     addPlayer: (team) =>
       update((prev) => ({
