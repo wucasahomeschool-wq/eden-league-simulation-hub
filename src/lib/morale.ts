@@ -96,13 +96,19 @@ export function applyTeamEvent(team: LeagueTeam, event: TeamEvent): boolean {
 // Rather than snapping morale to a flat number, the squad recovers part of the
 // way toward the renewal target (a fresh start lifts spirits but doesn't erase
 // a bad run overnight).
+//
+// User-controlled (contract-exempt) clubs are NEVER sacked — their manager,
+// tactics, and morale are left entirely under the user's control.
 export function triggerManagerSack(team: LeagueTeam): void {
+  if (isContractExempt(team.name)) return;
   const options = TACTICS.filter((t) => t !== team.tactical_style);
   team.tactical_style = options[Math.floor(Math.random() * options.length)];
   const current = team.morale ?? settings.moraleBaseline;
   const target = settings.managerRenewalMorale;
   // Halfway recovery toward the target, guaranteeing at least a small lift.
   team.morale = clampMorale(Math.max(current + 8, Math.round((current + target) / 2)));
+  // Record the dismissal so the state layer can queue an AI replacement.
+  sackedTeams.push(team.name);
 }
 
 // Apply a player micro event in place. Exempt clubs ignore player events.
