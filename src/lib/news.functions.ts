@@ -50,7 +50,9 @@ export const generateNews = createServerFn({ method: "POST" })
     if (typeof data.brief !== "string" || data.brief.trim().length === 0) {
       throw new Error("Missing data brief");
     }
-    return data;
+    const focus =
+      typeof data.focus === "string" ? data.focus.trim().slice(0, 500) : "";
+    return { ...data, focus };
   })
   .handler(async ({ data }) => {
     const apiKey = process.env.LOVABLE_API_KEY;
