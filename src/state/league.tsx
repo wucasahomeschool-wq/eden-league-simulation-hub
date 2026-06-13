@@ -895,6 +895,30 @@ function autoPromote(team: LeagueTeam, incoming: LeaguePlayer[]): LeagueTeam {
   return { ...team, lineup };
 }
 
+// Backfill any empty starting slots with the best available healthy reserve so a
+// club is never left a man short after a departure (trade-away, release). GK
+// slots prefer a goalkeeper; outfield slots take the highest-rated healthy bench
+// player. Complements autoPromote, which only ever brings incoming players in.
+function fillEmptyStarterSlots(team: LeagueTeam): LeagueTeam {
+  if (!team.lineup.includes("")) return team;
+  const slots = buildLineupSlots(team.formation);
+  const lineup = [...team.lineup];
+  const used = new Set(lineup.filter(Boolean));
+  const ranked = [...team.players].sort((a, b) => b.rating - a.rating);
+  slots.forEach((slot, i) => {
+    if (lineup[i]) return;
+    let pick: LeaguePlayer | undefined;
+    if (slot.group === "GK") {
+      pick = ranked.find(
+        (p) => !used.has(p.name) && !isPlayerOut(p) && positionGroup(p.position) === "GK"
+      );
+    }
+    if (!pick) pick = ranked.find((p) => !used.has(p.name) && !isPlayerOut(p));
+    if (pick) { used.add(pick.name); lineup[i] = pick.name; }
+  });
+  return { ...team, lineup };
+}
+
 // Drain any manager sacks recorded during the just-applied morale events and
 // queue AI-generated replacements (pendingGeneration). Returns the updated
 // managers map (unchanged reference when nothing was sacked).
