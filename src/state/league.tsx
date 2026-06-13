@@ -1541,8 +1541,15 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     setPlayoffResult: (matchId, homeGoals, awayGoals, method, payload) =>
       update((prev) => {
         if (!prev.playoffs) return prev;
+        const matchObj = prev.playoffs.rounds.flat().find((m) => m.id === matchId);
+        if (!matchObj || matchObj.result) return prev; // unknown or already recorded (idempotent)
+        const preStandings = computeStandings(prev);
         const { teams } = applyMatchEffects(
           prev.teams, payload, payload?.injuries, prev.currentWeek
+        );
+        // Apply match morale just like the regular season so playoff form counts.
+        const moraleTeams = applyMatchMorale(
+          teams, preStandings, matchObj.home, matchObj.away, homeGoals, awayGoals, payload
         );
         const rounds = prev.playoffs.rounds.map((round) =>
           round.map((m) =>
@@ -1551,7 +1558,8 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         );
         return {
           ...prev,
-          teams,
+          teams: moraleTeams,
+          managers: withPendingSacks(prev.managers),
           payloads: payload ? { ...prev.payloads, [matchId]: payload } : prev.payloads,
           playoffs: advancePlayoffs({ ...prev.playoffs, rounds }),
         };
