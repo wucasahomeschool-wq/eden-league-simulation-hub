@@ -205,6 +205,9 @@ function ManualEntryDialog({
 }) {
   const [h, setH] = useState("0");
   const [a, setA] = useState("0");
+  // Reset the score inputs whenever a different fixture is opened, so stale
+  // scores from a previous entry never carry over.
+  useEffect(() => { setH("0"); setA("0"); }, [fixture?.id]);
   return (
     <Dialog open={!!fixture} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-sm">
