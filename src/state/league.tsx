@@ -210,18 +210,70 @@ export function syncStarters(team: LeagueTeam): LeagueTeam {
   };
 }
 
+// ---------------- Best-fit replacement selection ----------------
+// Each position lives on a simple pitch map: x = lateral channel (left -1,
+// centre 0, right +1) and y = vertical line (GK 0 → striker 5). Lateral drift is
+// cheap, moving up/down the pitch is expensive — an RW slides to LW far more
+// naturally than an RW drops to CB. A keeper is unique: GK↔outfield never fits.
+const POS_COORD: Record<string, [number, number]> = {
+  GK: [0, 0],
+  CB: [0, 1], LB: [-1, 1], RB: [1, 1], LWB: [-1, 1.5], RWB: [1, 1.5], FB: [0, 1],
+  CDM: [0, 2], CM: [0, 3], LM: [-1, 3], RM: [1, 3], CAM: [0, 4],
+  ST: [0, 5], CF: [0, 4.5], LW: [-1, 5], RW: [1, 5], WINGER: [0.8, 5],
+};
+function coordFor(pos: string): [number, number] {
+  return POS_COORD[(pos || "").toUpperCase().trim()] ?? [0, 3];
+}
+// Position fit in [0,1]: 1 = identical role, 0 = totally unrelated (or GK gap).
+export function positionSimilarity(a: string, b: string): number {
+  const aGK = (a || "").toUpperCase().trim() === "GK";
+  const bGK = (b || "").toUpperCase().trim() === "GK";
+  if (aGK !== bGK) return 0; // outfielders can't deputise in goal, and vice versa
+  const [ax, ay] = coordFor(a);
+  const [bx, by] = coordFor(b);
+  const dx = (ax - bx) * 0.5; // lateral drift weighted lightly
+  const dy = (ay - by) * 2.0; // vertical (line) drift weighted heavily
+  const d = Math.sqrt(dx * dx + dy * dy);
+  return Math.max(0, 1 - d / 10); // 10 = GK↔striker, the widest realistic gap
+}
+// Pick the healthy bench player who best replaces an injured starter. Score
+// blends positional fit (dominant for big role gaps) with overall rating (the
+// tie-breaker between players in nearby roles) — so a stronger LW beats a weaker
+// RW for an RW slot, but a star CB never poaches that same RW slot.
+export function bestReplacement(
+  injured: LeaguePlayer,
+  candidates: LeaguePlayer[]
+): LeaguePlayer | undefined {
+  const healthy = candidates.filter((c) => !isPlayerOut(c));
+  if (!healthy.length) return undefined;
+  const score = (c: LeaguePlayer) =>
+    positionSimilarity(injured.position, c.position) * 10 + c.rating * 1.2;
+  return [...healthy].sort((a, b) => score(b) - score(a))[0];
+}
+
 // Mark a player as out (injured/suspended): remember the formation slot they
-// were starting in (or -1 if they were a bench player) and vacate that slot so
-// a replacement can be slotted in. The reservation is captured only once, on the
-// first match/edit that benches them, so chained cards don't overwrite it.
+// were starting in (or -1 if they were a bench player) and vacate that slot, then
+// auto-promote the best-fit healthy reserve into it. The reservation is captured
+// only once, on the first match/edit that benches them, so chained cards don't
+// overwrite it.
 export function markReserved(team: LeagueTeam, playerName: string): LeagueTeam {
   const slot = team.lineup.indexOf(playerName);
+  const injured = team.players.find((p) => p.name === playerName);
   const players = team.players.map((p) => {
     if (p.name !== playerName) return p;
     if (p.reservedSlot != null) return p; // reservation already captured
     return { ...p, reservedSlot: slot >= 0 ? slot : -1 };
   });
-  const lineup = slot >= 0 ? team.lineup.map((n, i) => (i === slot ? "" : n)) : team.lineup;
+  let lineup = slot >= 0 ? team.lineup.map((n, i) => (i === slot ? "" : n)) : team.lineup;
+  // Auto-fill the vacated slot with the best-fit healthy bench player.
+  if (slot >= 0 && injured) {
+    const inLineup = new Set(lineup.filter(Boolean));
+    const bench = players.filter(
+      (p) => p.name !== playerName && !inLineup.has(p.name) && !isPlayerOut(p)
+    );
+    const replacement = bestReplacement(injured, bench);
+    if (replacement) lineup = lineup.map((n, i) => (i === slot ? replacement.name : n));
+  }
   return syncStarters({ ...team, players, lineup });
 }
 
