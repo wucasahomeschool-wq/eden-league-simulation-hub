@@ -809,6 +809,7 @@ interface LeagueContextValue {
   executeManualTrade: (teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashAReceives: number, cashBReceives: number) => void;
   declineTrade: (proposalId: string) => void;
   refreshTradeProposals: () => void;
+  replaceManager: (team: string, manager: { name: string; personality: string }) => void;
   setSalary: (team: string, index: number, salary: number) => void;
   setContractYears: (team: string, index: number, years: number) => void;
   signFreeAgent: (team: string, freeAgentName: string) => void;
