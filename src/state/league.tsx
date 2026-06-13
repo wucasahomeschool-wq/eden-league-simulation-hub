@@ -49,6 +49,9 @@ export interface LeaguePlayer {
   morale: number; // 0–100, baseline 50
   injuryWeeks: number; // 0 = healthy; SEASON_ENDING_WEEKS = out for season
   suspensionWeeks: number; // 0 = not suspended
+  // Slot the player should reclaim when they recover. null = not out / no reservation;
+  // >= 0 = the formation slot index they started in; -1 = they were a bench player.
+  reservedSlot: number | null;
   yellowLog: number[]; // weeks in which unpunished yellows were received
   salary: number; // annual salary in $M (contract layer)
   contractYears: number; // years remaining on contract
@@ -203,11 +206,44 @@ export function syncStarters(team: LeagueTeam): LeagueTeam {
   };
 }
 
+// Mark a player as out (injured/suspended): remember the formation slot they
+// were starting in (or -1 if they were a bench player) and vacate that slot so
+// a replacement can be slotted in. The reservation is captured only once, on the
+// first match/edit that benches them, so chained cards don't overwrite it.
+export function markReserved(team: LeagueTeam, playerName: string): LeagueTeam {
+  const slot = team.lineup.indexOf(playerName);
+  const players = team.players.map((p) => {
+    if (p.name !== playerName) return p;
+    if (p.reservedSlot != null) return p; // reservation already captured
+    return { ...p, reservedSlot: slot >= 0 ? slot : -1 };
+  });
+  const lineup = slot >= 0 ? team.lineup.map((n, i) => (i === slot ? "" : n)) : team.lineup;
+  return syncStarters({ ...team, players, lineup });
+}
+
+// Restore a recovered player to the exact slot they held before going out. If
+// that slot is now occupied by a replacement, the replacement is bumped to the
+// bench. Bench players (reservedSlot === -1) simply return to the bench.
+export function restoreReserved(team: LeagueTeam, playerName: string): LeagueTeam {
+  const player = team.players.find((p) => p.name === playerName);
+  const slot = player?.reservedSlot ?? null;
+  let lineup = team.lineup;
+  if (slot != null && slot >= 0 && slot < lineup.length) {
+    lineup = lineup.map((n) => (n === playerName ? "" : n)); // avoid duplicates
+    lineup = lineup.map((n, i) => (i === slot ? playerName : n));
+  }
+  const players = team.players.map((p) =>
+    p.name === playerName ? { ...p, reservedSlot: null } : p
+  );
+  return syncStarters({ ...team, players, lineup });
+}
+
+
 export function blankPlayer(): LeaguePlayer {
   const base: LeaguePlayer = {
     name: "New Player", position: "CM", starter: false,
     age: 24, morale: MORALE_BASELINE,
-    injuryWeeks: 0, suspensionWeeks: 0, yellowLog: [],
+    injuryWeeks: 0, suspensionWeeks: 0, reservedSlot: null, yellowLog: [],
     salary: 5.0, contractYears: 2,
     rating: 5.0, FIN: 5.0, SHO: 5.0, PAS: 5.0, VIS: 5.0, DRI: 5.0,
     PAC: 5.0, STA: 5.0, DEF: 5.0, TAC: 5.0, POS_attr: 5.0, COM: 5.0,
@@ -221,7 +257,7 @@ export function youthPlayer(): LeaguePlayer {
   const base: LeaguePlayer = {
     name: "Youth Academy Call-up", position: "CM", starter: true,
     age: 18, morale: MORALE_BASELINE,
-    injuryWeeks: 0, suspensionWeeks: 0, yellowLog: [],
+    injuryWeeks: 0, suspensionWeeks: 0, reservedSlot: null, yellowLog: [],
     salary: 1.0, contractYears: 1,
     rating: 1.0, FIN: 1.0, SHO: 1.0, PAS: 1.0, VIS: 1.0, DRI: 1.0,
     PAC: 1.0, STA: 1.0, DEF: 1.0, TAC: 1.0, POS_attr: 1.0, COM: 1.0,
@@ -253,6 +289,7 @@ export function initState(): LeagueState {
         morale: MORALE_BASELINE,
         injuryWeeks: 0,
         suspensionWeeks: 0,
+        reservedSlot: null,
         yellowLog: [],
         salary: 0,
         contractYears: 0,
@@ -302,6 +339,7 @@ function normalize(state: LeagueState): LeagueState {
         ...p,
         injuryWeeks: p.injuryWeeks ?? 0,
         suspensionWeeks: p.suspensionWeeks ?? 0,
+        reservedSlot: p.reservedSlot ?? null,
         yellowLog: p.yellowLog ?? [],
         morale: p.morale ?? MORALE_BASELINE,
         age: p.age ?? 25,
@@ -572,6 +610,9 @@ function applyMatchEffects(
 ): { teams: Record<string, LeagueTeam>; protectedKeys: Set<string> } {
   const next = { ...teams };
   const protectedKeys = new Set<string>();
+  // Players benched by this match (red, second yellow, injury) — their starting
+  // slot is reserved so they reclaim it when they recover.
+  const outPlayers: { team: string; name: string }[] = [];
 
   const updatePlayerIn = (
     teamName: string,
@@ -596,6 +637,7 @@ function applyMatchEffects(
           starter: false,
         }));
         protectedKeys.add(`${ps.team}::${ps.name}`);
+        outPlayers.push({ team: ps.team, name: ps.name });
       } else if (ps.yellow > 0) {
         updatePlayerIn(ps.team, ps.name, (p) => {
           const log = [...p.yellowLog, currentWeek].filter(
@@ -603,6 +645,7 @@ function applyMatchEffects(
           );
           if (log.length >= 2) {
             protectedKeys.add(`${ps.team}::${ps.name}`);
+            outPlayers.push({ team: ps.team, name: ps.name });
             return {
               ...p,
               suspensionWeeks: Math.max(p.suspensionWeeks, YELLOW_SUSPENSION),
@@ -624,7 +667,13 @@ function applyMatchEffects(
         starter: false,
       }));
       protectedKeys.add(`${inj.team}::${inj.name}`);
+      outPlayers.push({ team: inj.team, name: inj.name });
     }
+  }
+
+  // Reserve each benched player's starting slot and vacate it for a replacement.
+  for (const out of outPlayers) {
+    if (next[out.team]) next[out.team] = markReserved(next[out.team], out.name);
   }
 
   return { teams: next, protectedKeys };
@@ -790,8 +839,8 @@ function moveTrade(
 
   const aSet = new Set(aPlayers.filter(Boolean));
   const bSet = new Set(bPlayers.filter(Boolean));
-  const movingFromA = teamA.players.filter((p) => aSet.has(p.name)).map((p) => ({ ...p, starter: false }));
-  const movingFromB = teamB.players.filter((p) => bSet.has(p.name)).map((p) => ({ ...p, starter: false }));
+  const movingFromA = teamA.players.filter((p) => aSet.has(p.name)).map((p) => ({ ...p, starter: false, reservedSlot: null }));
+  const movingFromB = teamB.players.filter((p) => bSet.has(p.name)).map((p) => ({ ...p, starter: false, reservedSlot: null }));
   if (!movingFromA.length && !movingFromB.length && cashAReceives === 0 && cashBReceives === 0) return prev;
 
   const aBudgetBefore = parseBudget(teamA.budget);
@@ -860,7 +909,7 @@ function offseasonTeam(team: LeagueTeam): LeagueTeam {
   const players: LeaguePlayer[] = [];
   let moraleBump = 0;
   for (const p of team.players) {
-    const res = ageOnePlayer({ ...p, injuryWeeks: 0, suspensionWeeks: 0, yellowLog: [] });
+    const res = ageOnePlayer({ ...p, injuryWeeks: 0, suspensionWeeks: 0, reservedSlot: null, yellowLog: [] });
     if (res.veteranFulfilled) moraleBump += 1;
     players.push(res.retired ? res.replacement! : res.player);
   }
@@ -997,6 +1046,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       const t = next.teams[name];
       const inLineup = new Set(t.lineup.filter(Boolean));
       const exempt = isManualSimTeam(name);
+      const returning: string[] = [];
       const players = t.players.map((p) => {
         let np = p;
         if (!protectedKeys.has(`${name}::${p.name}`) && (p.injuryWeeks > 0 || p.suspensionWeeks > 0)) {
@@ -1009,6 +1059,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
           // Comeback: returned to availability this week.
           if (wasOut && np.injuryWeeks === 0 && np.suspensionWeeks === 0) {
             np = { ...np, morale: clampMorale(np.morale + 15) };
+            returning.push(np.name);
           }
         }
         // Weekly selection / bench morale (player micro-events skip exempt clubs).
@@ -1018,7 +1069,12 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         }
         return np;
       });
-      teams[name] = { ...t, players };
+      let team = { ...t, players };
+      // Restore recovered players to the exact slot they held before going out.
+      for (const recoveredName of returning) {
+        team = restoreReserved(team, recoveredName);
+      }
+      teams[name] = team;
     }
     let advanced: LeagueState = { ...next, teams };
     if (advanced.currentWeek <= engineSettings.transferWindowLastWeek) {
@@ -1153,17 +1209,37 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       }),
     setInjuryWeeks: (team, index, weeks) =>
       update((prev) => {
-        const players = prev.teams[team].players.map((p, i) =>
-          i === index ? { ...p, injuryWeeks: Math.max(0, weeks) } : p
-        );
-        return { ...prev, teams: { ...prev.teams, [team]: { ...prev.teams[team], players } } };
+        const t = prev.teams[team];
+        const target = t.players[index];
+        if (!target) return prev;
+        const wasOut = target.injuryWeeks > 0 || target.suspensionWeeks > 0;
+        const willBeOut = Math.max(0, weeks) > 0 || target.suspensionWeeks > 0;
+        let team2: LeagueTeam = {
+          ...t,
+          players: t.players.map((p, i) =>
+            i === index ? { ...p, injuryWeeks: Math.max(0, weeks) } : p
+          ),
+        };
+        if (!wasOut && willBeOut) team2 = markReserved(team2, target.name);
+        else if (wasOut && !willBeOut) team2 = restoreReserved(team2, target.name);
+        return { ...prev, teams: { ...prev.teams, [team]: team2 } };
       }),
     setSuspensionWeeks: (team, index, weeks) =>
       update((prev) => {
-        const players = prev.teams[team].players.map((p, i) =>
-          i === index ? { ...p, suspensionWeeks: Math.max(0, weeks) } : p
-        );
-        return { ...prev, teams: { ...prev.teams, [team]: { ...prev.teams[team], players } } };
+        const t = prev.teams[team];
+        const target = t.players[index];
+        if (!target) return prev;
+        const wasOut = target.injuryWeeks > 0 || target.suspensionWeeks > 0;
+        const willBeOut = Math.max(0, weeks) > 0 || target.injuryWeeks > 0;
+        let team2: LeagueTeam = {
+          ...t,
+          players: t.players.map((p, i) =>
+            i === index ? { ...p, suspensionWeeks: Math.max(0, weeks) } : p
+          ),
+        };
+        if (!wasOut && willBeOut) team2 = markReserved(team2, target.name);
+        else if (wasOut && !willBeOut) team2 = restoreReserved(team2, target.name);
+        return { ...prev, teams: { ...prev.teams, [team]: team2 } };
       }),
     addPlayer: (team) =>
       update((prev) => ({
