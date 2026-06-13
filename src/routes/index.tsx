@@ -57,7 +57,7 @@ function Hub() {
       <header className="sticky top-0 z-40 border-b bg-card/90 backdrop-blur">
         <div className="h-1 w-full" style={{ backgroundImage: "var(--gradient-rb)" }} />
         <div className="mx-auto max-w-6xl px-4 py-3">
-          <div className="flex items-center gap-2">
+          <div className="relative flex items-center gap-2">
             <button
               onClick={prev}
               aria-label="Previous suite"
