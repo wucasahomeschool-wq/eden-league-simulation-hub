@@ -3,7 +3,19 @@
 // Individual Player Morale (0–100, baseline 50), drives a dynamic event matrix,
 // scales match-simulation weights, and triggers AI managerial sackings.
 import type { LeaguePlayer, LeagueTeam } from "@/state/league";
-import { settings, isManualSimTeam } from "@/lib/engine-settings";
+import { settings, isManualSimTeam, isContractExempt } from "@/lib/engine-settings";
+
+// ---------------- Manager sack registry ----------------
+// triggerManagerSack records the clubs whose manager was dismissed during the
+// current state update. The state layer drains this immediately afterward to
+// queue an AI-generated replacement manager. User-controlled (contract-exempt)
+// clubs are never sacked, so they never appear here.
+let sackedTeams: string[] = [];
+export function drainSackedTeams(): string[] {
+  const out = sackedTeams;
+  sackedTeams = [];
+  return out;
+}
 
 // Manual score-entry clubs bypass player-level micro events (their match
 // details are never simulated). Team-level macro events still apply to them.
