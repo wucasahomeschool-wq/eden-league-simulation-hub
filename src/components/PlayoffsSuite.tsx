@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useLeague, isManualOnly, isWeekComplete, matchWinner,
   PLAYOFF_ROUND_NAMES, type PlayoffMatch,
