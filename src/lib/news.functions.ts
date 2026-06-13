@@ -1,0 +1,96 @@
+import { createServerFn } from "@tanstack/react-start";
+
+// News Suite — entertainment-only AI article generator.
+// The CLIENT assembles a fact brief from REAL league state (scores, scorers,
+// ratings, standings, injuries, cards) and passes it here as a plain string.
+// This function never invents data; it only narrates the facts it is given.
+
+export type NewsKind = "postgame" | "roundup" | "drama";
+
+interface NewsInput {
+  kind: NewsKind;
+  brief: string; // pre-formatted factual digest assembled on the client
+}
+
+const SYSTEM_BY_KIND: Record<NewsKind, string> = {
+  postgame:
+    "You are a veteran soccer beat writer filing a post-match report for the Eden League.",
+  roundup:
+    "You are a senior soccer columnist writing a league-wide weekly roundup for the Eden League.",
+  drama:
+    "You are a sharp, gossip-savvy soccer feature writer covering the off-pitch storylines, rivalries, and media drama of the Eden League.",
+};
+
+const SHARED_RULES = `
+Eden League is a fictional 24-team 9v9 soccer league. Write vivid, human, opinionated coverage.
+
+ABSOLUTE RULES — these are non-negotiable:
+- Use ONLY the facts in the DATA block below. Never invent scores, scorers, assists, cards, injuries, ratings, standings, dates, quotes, attendances, or player/team names that are not present in the DATA.
+- If you want to add color (atmosphere, tactical reads, momentum), it must be plausible analysis grounded in the supplied numbers — never fabricated events.
+- Do NOT fabricate direct quotes. If you reference sentiment, frame it as the writer's read ("you sense...", "the body language suggested..."), not as a real quotation.
+- Player ratings are on a 1–10 scale; treat higher as better.
+
+TONE:
+- Highly strategic and analytical: read the tactics, the matchups, the table implications.
+- Witty and authentic to soccer culture — confident voice, dry humor, real terminology.
+- Avoid rigid, mechanical, robotic, list-like prose. Write flowing paragraphs a real columnist would publish.
+
+FORMAT:
+- Start with a bold, punchy headline as a markdown H2 (## Headline).
+- Then 2–4 tight paragraphs. No bullet-point stat dumps.
+- Keep it under ~320 words.
+`;
+
+export const generateNews = createServerFn({ method: "POST" })
+  .inputValidator((data: NewsInput) => {
+    if (!data || (data.kind !== "postgame" && data.kind !== "roundup" && data.kind !== "drama")) {
+      throw new Error("Invalid news kind");
+    }
+    if (typeof data.brief !== "string" || data.brief.trim().length === 0) {
+      throw new Error("Missing data brief");
+    }
+    return data;
+  })
+  .handler(async ({ data }) => {
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("AI is not configured");
+
+    const system = `${SYSTEM_BY_KIND[data.kind]}\n${SHARED_RULES}`;
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        temperature: 0.9,
+        messages: [
+          { role: "system", content: system },
+          {
+            role: "user",
+            content: `DATA (the only facts you may use):\n\n${data.brief}\n\nWrite the article now.`,
+          },
+        ],
+      }),
+    });
+
+    if (res.status === 429) {
+      throw new Error("RATE_LIMIT");
+    }
+    if (res.status === 402) {
+      throw new Error("CREDITS");
+    }
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`AI request failed (${res.status}): ${text.slice(0, 200)}`);
+    }
+
+    const json = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const content = json.choices?.[0]?.message?.content?.trim();
+    if (!content) throw new Error("AI returned an empty article");
+    return { article: content };
+  });
