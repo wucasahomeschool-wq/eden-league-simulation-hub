@@ -465,7 +465,7 @@ function normalize(state: LeagueState): LeagueState {
     redoStack: state.redoStack ?? [],
     teams: outTeams,
     salaryCap,
-    freeAgents: state.freeAgents ?? [],
+    freeAgents: (state.freeAgents ?? []).map(normalizePlayer),
     contractsInitialized,
     managers,
     settings: { ...mergedSettings, contractExemptTeams: [...mergedSettings.contractExemptTeams] },
