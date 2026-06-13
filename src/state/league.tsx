@@ -396,24 +396,29 @@ export function initState(): LeagueState {
 
 // Ensure migrated/older state has all required fields.
 function normalize(state: LeagueState): LeagueState {
+  // Per-player field backfill, shared by team rosters and the free-agent pool so
+  // an old/partial save can never surface a player missing a required field.
+  const normalizePlayer = (p: LeaguePlayer): LeaguePlayer => {
+    const player: LeaguePlayer = {
+      ...p,
+      injuryWeeks: p.injuryWeeks ?? 0,
+      suspensionWeeks: p.suspensionWeeks ?? 0,
+      reservedSlot: p.reservedSlot ?? null,
+      yellowLog: p.yellowLog ?? [],
+      morale: p.morale ?? MORALE_BASELINE,
+      age: p.age ?? 25,
+      salary: p.salary ?? calculateMarketValue(p.rating ?? 5),
+      contractYears: p.contractYears ?? 0,
+    };
+    // Guard age with > 0 (not truthiness) so a persisted age of 0 isn't re-rolled.
+    const withAge = player.age != null && player.age > 0 ? player : { ...player, age: computeStartingAge(player) };
+    return { ...withAge, rating: computeOverall(withAge) };
+  };
   const teams: Record<string, LeagueTeam> = {};
   for (const name of state.teamOrder) {
     const t = state.teams[name];
-    const players = t.players.map((p) => {
-      const player: LeaguePlayer = {
-        ...p,
-        injuryWeeks: p.injuryWeeks ?? 0,
-        suspensionWeeks: p.suspensionWeeks ?? 0,
-        reservedSlot: p.reservedSlot ?? null,
-        yellowLog: p.yellowLog ?? [],
-        morale: p.morale ?? MORALE_BASELINE,
-        age: p.age ?? 25,
-        salary: p.salary ?? calculateMarketValue(p.rating ?? 5),
-        contractYears: p.contractYears ?? 0,
-      };
-      const withAge = player.age ? player : { ...player, age: computeStartingAge(player) };
-      return { ...withAge, rating: computeOverall(withAge) };
-    });
+    if (!t) continue; // skip a missing/corrupt team entry rather than crashing
+    const players = t.players.map(normalizePlayer);
     const formation = t.formation ?? DEFAULT_FORMATION;
     let lineup = t.lineup;
     if (!lineup || lineup.length === 0) {
