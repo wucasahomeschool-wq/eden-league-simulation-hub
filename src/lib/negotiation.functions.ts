@@ -24,6 +24,7 @@ export interface NegotiationTurn {
 interface NegotiateInput {
   managerName: string;
   personality: string;
+  userManagerName?: string; // the user's own manager name, if they've set one
   brief: string; // factual digest assembled on the client
   terms: NegotiationTerms;
   history: NegotiationTurn[];
