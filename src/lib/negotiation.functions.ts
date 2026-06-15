@@ -24,6 +24,7 @@ export interface NegotiationTurn {
 interface NegotiateInput {
   managerName: string;
   personality: string;
+  userManagerName?: string; // the user's own manager name, if they've set one
   brief: string; // factual digest assembled on the client
   terms: NegotiationTerms;
   history: NegotiationTurn[];
@@ -135,9 +136,18 @@ export const negotiateTrade = createServerFn({ method: "POST" })
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured");
 
+    const counterpart =
+      data.userManagerName && data.userManagerName.trim() &&
+      data.userManagerName.trim().toUpperCase() !== "USER CONTROLLED"
+        ? data.userManagerName.trim()
+        : null;
+
     const system =
       `You are ${data.managerName}, manager of ${data.terms.aiTeam} in the Eden League.\n` +
       `YOUR PERSONALITY: ${data.personality}\n` +
+      (counterpart
+        ? `You are negotiating with ${counterpart}, the manager of ${data.terms.userTeam}. Address them by name (${counterpart}) in your replies.\n`
+        : "") +
       NEGOTIATION_RULES;
 
     const historyText = data.history.length

@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useLeague } from "@/state/league";
 import { generateNews, type NewsKind } from "@/lib/news.functions";
 import { buildPostgameBrief, buildRoundupBrief, buildDramaBrief } from "@/lib/news-brief";
+import { downloadText } from "@/lib/league-export";
 import { Button } from "@/components/ui/button";
 
 type Tab = NewsKind;
@@ -74,6 +75,14 @@ export function NewsSuite() {
       setLoading(false);
     }
   };
+
+  const exportArticle = () => {
+    if (!article) return;
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    downloadText(`eden-league-${tab}-${stamp}.md`, article);
+  };
+
+
 
   return (
     <div className="space-y-4">
@@ -173,6 +182,11 @@ export function NewsSuite() {
 
       {article && (
         <article className="rounded-xl border bg-card p-6 shadow-sm">
+          <div className="mb-4 flex justify-end">
+            <Button size="sm" variant="outline" onClick={exportArticle} className="font-semibold">
+              ⬇ Export Article
+            </Button>
+          </div>
           <div className="space-y-3 text-foreground/90">
             <ReactMarkdown
               components={{

@@ -1,8 +1,13 @@
 import { useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import {
   useLeague, TRANSFER_WINDOW_LAST_WEEK, type LeagueTeam,
 } from "@/state/league";
-import { calculatePlayerValue, tradeBlockReason, type TradeProposal } from "@/lib/trades";
+import {
+  calculatePlayerValue, tradeBlockReason, buildTradeMarketBrief,
+  buildProposalFromTerms, type TradeProposal,
+} from "@/lib/trades";
+import { generateAiTradeProposals } from "@/lib/trade-ai.functions";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,10 +21,49 @@ const TOP_COUNT = 5;
 const NONE = "__none__";
 
 export function TradesSuite() {
-  const { state, executeTrade, executeManualTrade, declineTrade, refreshTradeProposals } = useLeague();
+  const { state, executeTrade, executeManualTrade, declineTrade, setTradeProposals } = useLeague();
+  const runAiEngine = useServerFn(generateAiTradeProposals);
   const lastWindowWeek = state.settings?.transferWindowLastWeek ?? TRANSFER_WINDOW_LAST_WEEK;
   const inWindow = state.currentWeek <= lastWindowWeek;
   const [showAll, setShowAll] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  async function runAiTradeEngine() {
+    if (aiLoading) return;
+    setAiLoading(true);
+    try {
+      const brief = buildTradeMarketBrief(state);
+      const { proposals } = await runAiEngine({ data: { brief, count: 14 } });
+      // Re-validate every AI proposal against all safety guards before surfacing.
+      const validated: TradeProposal[] = [];
+      const seen = new Set<string>();
+      proposals.forEach((p, i) => {
+        const built = buildProposalFromTerms(
+          state, p.teamA, p.teamB, p.aSends, p.bSends, p.cashAReceives, p.cashBReceives, i
+        );
+        if (!built) return;
+        const key = `${built.teamA}|${built.aSends}|${built.teamB}|${built.bSends}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        validated.push(built);
+      });
+      validated.sort((a, b) => b.deltaUA + b.deltaUB - (a.deltaUA + a.deltaUB));
+      setTradeProposals(validated);
+      if (validated.length === 0) {
+        toast.warning("No legal deals", { description: "The AI couldn't find any valid trades this round. Try again." });
+      } else {
+        toast.success("AI trade engine ran", { description: `${validated.length} fresh proposals on the desk.` });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("RATE_LIMIT")) toast.error("AI is busy", { description: "Try again in a moment." });
+      else if (msg.includes("CREDITS")) toast.error("AI credits exhausted", { description: "Add credits in Settings → Workspace → Usage." });
+      else toast.error("Trade engine failed", { description: "Couldn't reach the AI. Please try again." });
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
 
   // Deals touching a user-controlled (exempt) club are handled in the
   // Negotiation Suite. The automatic desk here shows pure AI-vs-AI deals only.
@@ -61,15 +105,17 @@ export function TradesSuite() {
           <div>
             <h2 className="text-base font-extrabold uppercase tracking-wide">Automatic Trade Desk</h2>
             <p className="text-xs text-muted-foreground">
-              The market engine scans all 24 clubs each match week and ranks the best deals — the
-              top {TOP_COUNT} are shown first, with the option to reveal more lesser trades.{" "}
+              The AI trade engine reads the entire league — every roster, rating, value, budget and
+              cap — and proposes the most realistic deals. The top {TOP_COUNT} are shown first, with
+              the option to reveal more.{" "}
               {inWindow ? "Transfer window OPEN." : `Window closed (reopens next season, runs through Week ${lastWindowWeek}).`}
             </p>
           </div>
-          <Button size="sm" variant="outline" onClick={refreshTradeProposals}>
-            RUN TRADE ENGINE NOW
+          <Button size="sm" variant="outline" onClick={runAiTradeEngine} disabled={aiLoading}>
+            {aiLoading ? "RUNNING AI…" : "RUN AI TRADE ENGINE"}
           </Button>
         </div>
+
 
         {autoProposals.length === 0 ? (
           <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">

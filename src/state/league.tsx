@@ -866,6 +866,7 @@ interface LeagueContextValue {
   executeManualTrade: (teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashAReceives: number, cashBReceives: number) => void;
   declineTrade: (proposalId: string) => void;
   refreshTradeProposals: () => void;
+  setTradeProposals: (proposals: TradeProposal[]) => void;
   replaceManager: (team: string, manager: { name: string; personality: string }) => void;
   setSalary: (team: string, index: number, salary: number) => void;
   setContractYears: (team: string, index: number, years: number) => void;
@@ -1585,6 +1586,8 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       })),
     refreshTradeProposals: () =>
       update((prev) => ({ ...prev, tradeProposals: generateTradeProposals(prev) })),
+    setTradeProposals: (proposals) =>
+      update((prev) => ({ ...prev, tradeProposals: proposals })),
     replaceManager: (team, manager) =>
       update((prev) => {
         if (!prev.teams[team]) return prev;

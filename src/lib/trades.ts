@@ -374,3 +374,90 @@ export function tradeBlockReason(
 
   return null;
 }
+
+// ---------------- AI trade engine helpers ----------------
+// Build a factual digest of the ENTIRE league market (all rosters, ratings,
+// values, positions, contracts, salaries, budgets, cap) for the AI proposal
+// generator. Every number is real — derived strictly from league state.
+function aiRosterLines(team: LeagueTeam): string {
+  return team.players
+    .map((p) => {
+      const status =
+        p.injuryWeeks > 0 ? ` [injured]`
+        : p.suspensionWeeks > 0 ? ` [suspended]`
+        : "";
+      return `    - ${p.name} (${p.position}, age ${p.age}, rating ${p.rating.toFixed(1)}, value $${calculatePlayerValue(p)}M, ${p.contractYears}yr @ $${p.salary}M)${status}`;
+    })
+    .join("\n");
+}
+
+export function buildTradeMarketBrief(state: LeagueState, excludeTeams: string[] = []): string {
+  const cap = state.salaryCap ?? 0;
+  const exclude = new Set(excludeTeams);
+  const lines: string[] = [
+    `SALARY CAP: $${cap}M hard cap (a club's total payroll cannot exceed this after a trade).`,
+    `CURRENT SEASON ${state.season}, WEEK ${state.currentWeek}.`,
+    ``,
+  ];
+  for (const name of state.teamOrder) {
+    if (exclude.has(name)) continue;
+    const t = state.teams[name];
+    if (!t) continue;
+    const payroll = Math.round(t.players.reduce((s, p) => s + (p.salary ?? 0), 0) * 10) / 10;
+    lines.push(
+      `${name} — style "${t.tactical_style}", transfer budget ${t.budget}, payroll $${payroll}M:`,
+      aiRosterLines(t),
+      ``
+    );
+  }
+  lines.push(
+    `Note: player "value" is the league's fair-market valuation in $M. A fair deal trades players of similar combined value, with cash bridging any gap.`
+  );
+  return lines.join("\n");
+}
+
+// Validate a single AI-proposed deal against ALL existing safety guards and,
+// if legal, return a complete TradeProposal (with locally-computed utility
+// deltas). Returns null for any illegal / hallucinated deal.
+export function buildProposalFromTerms(
+  state: LeagueState,
+  teamA: string,
+  teamB: string,
+  aSends: string,
+  bSends: string,
+  cashAReceives: number,
+  cashBReceives: number,
+  idSuffix: string | number
+): TradeProposal | null {
+  const ta = state.teams[teamA];
+  const tb = state.teams[teamB];
+  if (!ta || !tb || teamA === teamB) return null;
+
+  const pA = ta.players.find((p) => p.name === aSends);
+  const pB = tb.players.find((p) => p.name === bSends);
+  if (!pA || !pB) return null;
+
+  const cashA = Math.max(0, round1(cashAReceives) || 0);
+  const cashB = Math.max(0, round1(cashBReceives) || 0);
+
+  const reason = tradeBlockReason(state, teamA, teamB, [aSends], [bSends], cashA, cashB);
+  if (reason) return null;
+
+  const squadA = buildSquad(ta);
+  const squadB = buildSquad(tb);
+  const deltaUA = tradeUtilityDelta(squadA, pA, pB, cashA - cashB);
+  const deltaUB = tradeUtilityDelta(squadB, pB, pA, cashB - cashA);
+
+  return {
+    id: `tp-ai-${state.season}-w${state.currentWeek}-${idSuffix}`,
+    teamA,
+    teamB,
+    aSends,
+    bSends,
+    cashAReceives: cashA,
+    cashBReceives: cashB,
+    deltaUA: round2(deltaUA),
+    deltaUB: round2(deltaUB),
+  };
+}
+

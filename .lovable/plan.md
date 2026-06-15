@@ -1,85 +1,87 @@
-# Negotiation Suite — Plan
+# Three changes: manager names, article export, AI trade engine
 
-A new, fully additive suite where you (the user-controlled teams) negotiate trades with the AI managers of other clubs. Each AI club has a distinct manager personality (from your uploaded file); the AI writes in-character replies to your offers and signals when a deal is agreed. Nothing about the simulation engine, contract engine, or existing trade math changes — this layer sits on top.
+## 1. Make AI managers address you by your manager's name
 
-## Key decisions (locked in)
-- **User-controlled teams = the existing "exempt clubs" selector** (`contractExemptTeams`, currently `Gugu Team` + `Spams`). That one Settings control now drives both the contract engine AND negotiations. No new selector.
-- **Gugu Team & Spams** get the personality label `USER CONTROLLED` and are never given an AI manager.
-- **Negotiation chat is ephemeral** — lives in the session, resets on reload. No database changes.
+**Current behavior (the answer to your question):** No — putting a name in the
+"User Controlled" name slot in the Team Editor does **not** currently make rival
+managers address you by it. The negotiation brief (`src/lib/negotiation-brief.ts`)
+only tells the AI your **club** name ("the USER's club"). The AI never receives
+your manager's name, so it can only address your club, not you. The Team Editor
+already lets you rename your manager (`replaceManager` saves it to
+`state.managers[yourTeam].name`), but that name is purely cosmetic today.
 
-## How trades route
-- The trade engine still scans all 24 clubs exactly as today.
-- **Trades Suite**: now shows only proposals where *neither* club is user-controlled (pure AI-vs-AI deals) — unchanged accept/decline behavior.
-- **Negotiation Suite**: shows proposals where *one* club is user-controlled. Instead of a one-click accept, you open a chat with that club's AI manager.
-- The Manual Trade Builder stays in the Trades Suite, untouched.
+**Fix:** thread your manager name into the AI prompt.
+- `NegotiationSuite.tsx` already knows the user team; look up
+  `state.managers[seed.userTeam]?.name` and pass it as a new `userManagerName`
+  field when calling `negotiateTrade`.
+- `negotiation.functions.ts`: accept `userManagerName`, and add a line to the
+  system prompt instructing the manager to address the counterpart by that name
+  (falling back to the club name if it's still the literal "USER CONTROLLED" or
+  empty).
+- `negotiation-brief.ts`: label the user's block with the manager's name so the
+  AI has it in the DATA block too.
 
-## Negotiation flow
-1. Pick one of your user-controlled teams' pending proposals (or start a fresh offer against any AI club via a builder).
-2. Chat opens with the AI manager, who greets you in-character based on their personality.
-3. You send messages / offers (which players + cash each side gives). The AI replies in-character — haggling, countering, or rejecting per its personality and the real player values, budgets, and cap.
-4. When the manager agrees to the *current on-the-table terms*, an **INITIATE TRADE** button appears.
-5. INITIATE TRADE runs the exact same `executeManualTrade(...)` used by the Trades Suite (with the same `tradeBlockReason` pre-flight guard), so all roster/cap/budget rules are enforced identically.
+Result: rename your manager once in the Team Editor and every rival manager
+greets/addresses you by that name.
 
-The AI only ever *talks*. It never mutates league state. The trade is executed by existing, trusted code using the concrete terms shown on screen.
+## 2. "Export Article" button in the Newsroom
 
-## Manager personalities & sacking
-- A new `managers` map is added to league state, seeded from your uploaded personality file for the 22 AI clubs; the 2 user clubs are `USER CONTROLLED`.
-- When an AI club's manager is sacked (existing morale mechanic), a fresh AI-generated manager (name + personality) replaces them via Lovable AI. User-controlled clubs are **never** sacked — their manager flag is protected.
-- All existing morale math stays identical; only the manager-identity swap is added.
+In `src/components/NewsSuite.tsx`, when an `article` exists, render an **Export
+Article** button next to the article header.
+- Add a small download helper (plain-text/markdown blob, mirroring the
+  `downloadJson` pattern in `src/lib/league-export.ts`).
+- Filename includes the article kind and a timestamp, e.g.
+  `eden-league-postgame-2026-06-15.md`.
+- Export the raw markdown the AI returned (headings/bold preserved) so it's
+  readable as a `.md` or plain-text file.
 
-```text
-Trade engine (unchanged)
-        │ generates proposals
-        ▼
- ┌─────────────┬───────────────────────────┐
- │ AI vs AI    │ involves a user team        │
- ▼             ▼
-Trades Suite   Negotiation Suite ──chat──► AI manager (Lovable AI)
-(1-click)             │ deal agreed
-                      ▼
-              INITIATE TRADE → executeManualTrade() (shared)
-```
+## 3. Replace the static trade formula with Lovable AI — yes, this is possible
 
-## Safety
-- Additive only: new suite, new server function, new data file, a new state field with a migration default. Existing suites keep working if the feature is ignored.
-- Trade routing is a display filter; execution reuses existing functions.
-- AI calls are isolated server-side (like the Newsroom). AI output is never trusted for state changes.
-- If Lovable AI is unavailable, negotiation shows a friendly error and the Trades Suite manual builder remains a full fallback.
+Today proposals come from `generateTradeProposals()` in `src/lib/trades.ts` (a
+deterministic utility formula over a sampled subset of players). We'll swap the
+**proposal generation** to Lovable AI while keeping all the existing safety
+checks, because an AI can hallucinate players, cash, or illegal deals.
 
----
+**New server function** `generateAiTradeProposals` (new file
+`src/lib/trade-ai.functions.ts`, mirroring `negotiation.functions.ts`):
+- Input: a full-league brief (all 24 rosters with ratings/values/positions/
+  contracts/salaries, every club budget, the salary cap, current week). Unlike
+  the formula, the AI sees the **entire** league, not a sampled subset.
+- Prompt: instruct the model to act as the league's trade market and return a
+  JSON array of realistic, mutually-beneficial proposals (player-for-player +
+  optional cash), using only real players/values from the DATA.
+- Output parsed into the existing `TradeProposal` shape.
 
-## Technical details
+**Client wiring (`src/state/league.tsx`):**
+- `refreshTradeProposals` becomes async: call the AI function, then **validate
+  every returned proposal** through the existing `tradeBlockReason` /
+  roster-legality guards in `trades.ts`. Drop any deal that's illegal,
+  references a non-existent player, or breaks the cap/fieldability rules. Only
+  validated deals are stored.
+- Recompute `deltaUA`/`deltaUB` locally (so the Trades Suite still shows utility
+  and can rank), or display them as AI-judged — kept consistent with the current
+  UI.
+- The Trades Suite "RUN TRADE ENGINE NOW" button triggers this; show a loading
+  state and handle rate-limit (429) / credits (402) errors with a toast, like
+  the other AI suites.
 
-**1. Manager data — `src/data/managers.ts` (new)**
-Map of team name → `{ name: string; personality: string; userControlled?: boolean }`, transcribed from the uploaded PDF for 22 clubs; `Gugu Team` & `Spams` → `personality: "USER CONTROLLED"`.
+**Weekly auto-generation:** the weekly advance currently calls the formula
+synchronously. AI calls are async and cost credits, so weekly advance will keep
+working but **not** auto-spend credits every week — instead proposals refresh
+on demand via the button (and the Negotiation Suite still routes any
+user-club deals). I'll keep the old `generateTradeProposals` formula in the
+codebase as an offline fallback if the AI is unavailable.
 
-**2. State — `src/state/league.tsx`**
-- Add `managers: Record<string, { name: string; personality: string; pendingGeneration?: boolean }>` to `LeagueState`.
-- Seed it in `createInitialState` and backfill in `normalize()` (so existing Cloud saves migrate). Persists automatically with the whole-state upsert.
-- New context action `replaceManager(team, manager)` (used after AI generation).
-- `triggerManagerSack` path: when an AI club is sacked, set its manager to an interim placeholder with `pendingGeneration: true`; guard so exempt/user teams are never sacked (manager untouched). Morale math unchanged.
+### Technical notes
+- New AI server function follows the exact gateway pattern already used in
+  `negotiation.functions.ts` (model `google/gemini-3-flash-preview`, 30s abort,
+  429/402 handling, tolerant JSON extraction).
+- All trade legality stays enforced client-side by `tradeBlockReason`; the AI
+  only *proposes*, it never bypasses validation or mutates state.
+- No schema/database changes. `tradeProposals` keeps its current shape and
+  Cloud persistence path.
 
-**3. Sacking guard — `src/lib/morale.ts` + `engine-settings.ts`**
-`triggerManagerSack(team)` early-returns the manager swap when `isContractExempt(team.name)` (reusing the existing live check). Tactical/morale numbers unchanged otherwise.
-
-**4. AI server functions — `src/lib/negotiation.functions.ts` (new)**, mirroring `news.functions.ts`:
-- `negotiateTrade`: inputs = manager personality, factual trade brief (real player names/ratings/values, both budgets, salary cap headroom), conversation history, and the user's latest message + current proposed terms. Returns `{ reply: string; accepts: boolean }`. System prompt forbids inventing players/stats and enforces in-character tone + the personality's trading tolerance.
-- `generateManager`: generates a new in-character `{ name, personality }` for a sacked AI club.
-- Both use the Lovable AI gateway (`google/gemini-3-flash-preview`) with the same 429/402 error handling as the Newsroom.
-
-**5. Fact brief — `src/lib/negotiation-brief.ts` (new)**
-Pure functions assembling the factual digest (players, `calculatePlayerValue`, budgets, cap) from real state — no fabricated numbers.
-
-**6. UI — `src/components/NegotiationSuite.tsx` (new)**
-- Lists pending proposals involving user teams; chat panel with markdown replies (`react-markdown`, already installed); offer builder (reuse the cascading player/cash pattern from `TradesSuite`).
-- On `accepts === true` for current terms, show **INITIATE TRADE** → runs `tradeBlockReason` then `executeManualTrade(...)`, toast on success.
-- A `useEffect` watches for managers with `pendingGeneration` and calls `generateManager`, then `replaceManager`.
-
-**7. Trades Suite filter — `src/components/TradesSuite.tsx`**
-Filter the auto-desk list to proposals where neither club `isContractExempt`. Manual builder unchanged.
-
-**8. Register suite — `src/routes/index.tsx`**
-Add `{ name: "Negotiation", render: () => <NegotiationSuite /> }` to the `SUITES` array.
-
-**9. Memory**
-Save a feature memory documenting: exempt selector = user-controlled teams, negotiation routing, AI manager personalities + sacking regeneration, ephemeral chat.
+### Out of scope / preserved
+- The match **simulation** engine is untouched (golden rule). Only the trade
+  *proposal* generator changes.
+- Manual Trade Builder and the accept/decline flow are unchanged.
