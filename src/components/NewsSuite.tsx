@@ -174,6 +174,11 @@ export function NewsSuite() {
 
       {article && (
         <article className="rounded-xl border bg-card p-6 shadow-sm">
+          <div className="mb-4 flex justify-end">
+            <Button size="sm" variant="outline" onClick={exportArticle} className="font-semibold">
+              ⬇ Export Article
+            </Button>
+          </div>
           <div className="space-y-3 text-foreground/90">
             <ReactMarkdown
               components={{
