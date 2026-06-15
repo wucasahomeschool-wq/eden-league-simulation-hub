@@ -105,15 +105,17 @@ export function TradesSuite() {
           <div>
             <h2 className="text-base font-extrabold uppercase tracking-wide">Automatic Trade Desk</h2>
             <p className="text-xs text-muted-foreground">
-              The market engine scans all 24 clubs each match week and ranks the best deals — the
-              top {TOP_COUNT} are shown first, with the option to reveal more lesser trades.{" "}
+              The AI trade engine reads the entire league — every roster, rating, value, budget and
+              cap — and proposes the most realistic deals. The top {TOP_COUNT} are shown first, with
+              the option to reveal more.{" "}
               {inWindow ? "Transfer window OPEN." : `Window closed (reopens next season, runs through Week ${lastWindowWeek}).`}
             </p>
           </div>
-          <Button size="sm" variant="outline" onClick={refreshTradeProposals}>
-            RUN TRADE ENGINE NOW
+          <Button size="sm" variant="outline" onClick={runAiTradeEngine} disabled={aiLoading}>
+            {aiLoading ? "RUNNING AI…" : "RUN AI TRADE ENGINE"}
           </Button>
         </div>
+
 
         {autoProposals.length === 0 ? (
           <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
