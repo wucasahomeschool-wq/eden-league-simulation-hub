@@ -76,6 +76,14 @@ export function NewsSuite() {
     }
   };
 
+  const exportArticle = () => {
+    if (!article) return;
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    downloadText(`eden-league-${tab}-${stamp}.md`, article);
+  };
+
+
+
   return (
     <div className="space-y-4">
       <div className="rounded-lg border-l-4 border-highlight-blue bg-card px-4 py-2 text-xs text-muted-foreground">
