@@ -32,10 +32,17 @@ export function buildNegotiationBrief(
 
   const cap = state.salaryCap ?? 0;
 
+  const userMgrRaw = state.managers?.[userTeamName]?.name?.trim();
+  const userMgr =
+    userMgrRaw && userMgrRaw.toUpperCase() !== "USER CONTROLLED" ? userMgrRaw : null;
+  const userLabel = userMgr
+    ? `${userTeamName} (the USER's club, managed by ${userMgr})`
+    : `${userTeamName} (the USER's club)`;
+
   return [
     `SALARY CAP: $${cap}M hard cap (a club's total payroll cannot exceed this after a trade).`,
     ``,
-    `${userTeamName} (the USER's club) — tactical style "${userTeam.tactical_style}":`,
+    `${userLabel} — tactical style "${userTeam.tactical_style}":`,
     `  Transfer budget: ${userTeam.budget}. Current payroll: $${payrollOf(userTeam)}M.`,
     `  Roster:`,
     rosterLines(userTeam),
