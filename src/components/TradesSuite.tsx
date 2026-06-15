@@ -21,10 +21,49 @@ const TOP_COUNT = 5;
 const NONE = "__none__";
 
 export function TradesSuite() {
-  const { state, executeTrade, executeManualTrade, declineTrade, refreshTradeProposals } = useLeague();
+  const { state, executeTrade, executeManualTrade, declineTrade, setTradeProposals } = useLeague();
+  const runAiEngine = useServerFn(generateAiTradeProposals);
   const lastWindowWeek = state.settings?.transferWindowLastWeek ?? TRANSFER_WINDOW_LAST_WEEK;
   const inWindow = state.currentWeek <= lastWindowWeek;
   const [showAll, setShowAll] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  async function runAiTradeEngine() {
+    if (aiLoading) return;
+    setAiLoading(true);
+    try {
+      const brief = buildTradeMarketBrief(state);
+      const { proposals } = await runAiEngine({ data: { brief, count: 14 } });
+      // Re-validate every AI proposal against all safety guards before surfacing.
+      const validated: TradeProposal[] = [];
+      const seen = new Set<string>();
+      proposals.forEach((p, i) => {
+        const built = buildProposalFromTerms(
+          state, p.teamA, p.teamB, p.aSends, p.bSends, p.cashAReceives, p.cashBReceives, i
+        );
+        if (!built) return;
+        const key = `${built.teamA}|${built.aSends}|${built.teamB}|${built.bSends}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        validated.push(built);
+      });
+      validated.sort((a, b) => b.deltaUA + b.deltaUB - (a.deltaUA + a.deltaUB));
+      setTradeProposals(validated);
+      if (validated.length === 0) {
+        toast.warning("No legal deals", { description: "The AI couldn't find any valid trades this round. Try again." });
+      } else {
+        toast.success("AI trade engine ran", { description: `${validated.length} fresh proposals on the desk.` });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("RATE_LIMIT")) toast.error("AI is busy", { description: "Try again in a moment." });
+      else if (msg.includes("CREDITS")) toast.error("AI credits exhausted", { description: "Add credits in Settings → Workspace → Usage." });
+      else toast.error("Trade engine failed", { description: "Couldn't reach the AI. Please try again." });
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
 
   // Deals touching a user-controlled (exempt) club are handled in the
   // Negotiation Suite. The automatic desk here shows pure AI-vs-AI deals only.
