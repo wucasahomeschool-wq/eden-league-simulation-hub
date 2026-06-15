@@ -1586,6 +1586,8 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       })),
     refreshTradeProposals: () =>
       update((prev) => ({ ...prev, tradeProposals: generateTradeProposals(prev) })),
+    setTradeProposals: (proposals) =>
+      update((prev) => ({ ...prev, tradeProposals: proposals })),
     replaceManager: (team, manager) =>
       update((prev) => {
         if (!prev.teams[team]) return prev;
