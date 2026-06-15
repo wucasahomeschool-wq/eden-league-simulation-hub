@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useLeague } from "@/state/league";
 import { generateNews, type NewsKind } from "@/lib/news.functions";
 import { buildPostgameBrief, buildRoundupBrief, buildDramaBrief } from "@/lib/news-brief";
+import { downloadText } from "@/lib/league-export";
 import { Button } from "@/components/ui/button";
 
 type Tab = NewsKind;
