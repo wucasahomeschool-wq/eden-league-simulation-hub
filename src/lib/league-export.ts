@@ -18,6 +18,19 @@ export function downloadJson(filename: string, data: unknown) {
   URL.revokeObjectURL(url);
 }
 
+// Generic browser download for plain text / markdown content.
+export function downloadText(filename: string, content: string, mime = "text/markdown") {
+  const blob = new Blob([content], { type: `${mime};charset=utf-8` });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 const stamp = () => new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
 
 // ---------------- Full league export ----------------
