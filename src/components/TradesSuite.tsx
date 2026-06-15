@@ -1,8 +1,13 @@
 import { useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import {
   useLeague, TRANSFER_WINDOW_LAST_WEEK, type LeagueTeam,
 } from "@/state/league";
-import { calculatePlayerValue, tradeBlockReason, type TradeProposal } from "@/lib/trades";
+import {
+  calculatePlayerValue, tradeBlockReason, buildTradeMarketBrief,
+  buildProposalFromTerms, type TradeProposal,
+} from "@/lib/trades";
+import { generateAiTradeProposals } from "@/lib/trade-ai.functions";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
