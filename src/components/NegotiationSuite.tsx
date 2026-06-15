@@ -259,6 +259,7 @@ function NegotiationPanel({ seed, onClose }: { seed: SessionSeed; onClose: () =>
         data: {
           managerName: manager?.name ?? seed.aiTeam,
           personality: manager?.personality ?? "A balanced, fair negotiator.",
+          userManagerName: state.managers?.[seed.userTeam]?.name,
           brief,
           terms,
           history,
