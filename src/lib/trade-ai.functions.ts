@@ -122,6 +122,7 @@ export const generateAiTradeProposals = createServerFn({ method: "POST" })
     if (!apiKey) throw new Error("AI is not configured");
 
     const count = Math.min(Math.max(data.count ?? 12, 4), 25);
+    const rules = data.allowPicks ? TRADE_RULES_PICKS : TRADE_RULES;
     const user = [
       `DATA (the only facts you may use):`,
       ``,
@@ -130,8 +131,11 @@ export const generateAiTradeProposals = createServerFn({ method: "POST" })
       `Propose up to ${count} of the best, most realistic trades right now. JSON array only.`,
     ].join("\n");
 
-    const content = await callGateway(apiKey, TRADE_RULES, user);
+    const content = await callGateway(apiKey, rules, user);
     const raw = extractJsonArray<Record<string, unknown>>(content) ?? [];
+
+    const asLabels = (v: unknown): string[] =>
+      Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.trim().length > 0) : [];
 
     const proposals: AiProposedTerm[] = [];
     for (const r of raw) {
@@ -139,12 +143,20 @@ export const generateAiTradeProposals = createServerFn({ method: "POST" })
       const teamB = typeof r.teamB === "string" ? r.teamB : "";
       const aSends = typeof r.aSends === "string" ? r.aSends : "";
       const bSends = typeof r.bSends === "string" ? r.bSends : "";
-      if (!teamA || !teamB || !aSends || !bSends) continue;
+      const aPicks = asLabels(r.aPicks);
+      const bPicks = asLabels(r.bPicks);
+      if (!teamA || !teamB) continue;
+      // A valid deal must move at least one asset on at least one side.
+      const hasAsset = aSends || bSends || aPicks.length || bPicks.length ||
+        Number(r.cashAReceives) > 0 || Number(r.cashBReceives) > 0;
+      if (!hasAsset) continue;
       proposals.push({
         teamA,
         teamB,
         aSends,
         bSends,
+        aPicks,
+        bPicks,
         cashAReceives: Number(r.cashAReceives) || 0,
         cashBReceives: Number(r.cashBReceives) || 0,
       });
