@@ -412,14 +412,18 @@ export function buildTradeMarketBrief(state: LeagueState, excludeTeams: string[]
     const t = state.teams[name];
     if (!t) continue;
     const payroll = Math.round(t.players.reduce((s, p) => s + (p.salary ?? 0), 0) * 10) / 10;
+    const ownedPicks = (state.draftPicks ?? [])
+      .filter((pk) => pk.owner === name)
+      .map(pickLabel);
     lines.push(
       `${name} — style "${t.tactical_style}", transfer budget ${t.budget}, payroll $${payroll}M:`,
       aiRosterLines(t),
+      `    draft picks owned: ${ownedPicks.length ? ownedPicks.join(", ") : "none"}`,
       ``
     );
   }
   lines.push(
-    `Note: player "value" is the league's fair-market valuation in $M. A fair deal trades players of similar combined value, with cash bridging any gap.`
+    `Note: player "value" is the league's fair-market valuation in $M. A fair deal trades players of similar combined value, with cash bridging any gap. Draft picks are valuable assets, especially for clubs short on budget (every rookie signs a cheap $2M/2yr deal).`
   );
   return lines.join("\n");
 }
