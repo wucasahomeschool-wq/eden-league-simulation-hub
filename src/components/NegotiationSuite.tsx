@@ -9,6 +9,7 @@ import {
   type NegotiationTurn,
 } from "@/lib/negotiation.functions";
 import { toast } from "sonner";
+import { PlayerSearch } from "@/components/PlayerSearch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
