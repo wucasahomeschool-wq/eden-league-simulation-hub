@@ -539,6 +539,19 @@ function normalize(state: LeagueState): LeagueState {
     contractsInitialized,
     managers,
     settings: { ...mergedSettings, contractExemptTeams: [...mergedSettings.contractExemptTeams] },
+    // Draft picks must always exist (48). Backfill for older saves, keeping any
+    // existing ownership; if the set is missing/wrong size, rebuild from scratch.
+    draftPicks:
+      state.draftPicks && state.draftPicks.length === DRAFT_POOL_SIZE
+        ? state.draftPicks
+        : buildDraftPicks(state.teamOrder, state.season ?? 1),
+    draft: state.draft
+      ? {
+          ...state.draft,
+          prospects: (state.draft.prospects ?? []).map(normalizePlayer),
+          selections: state.draft.selections ?? [],
+        }
+      : undefined,
   };
 }
 
