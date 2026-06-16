@@ -87,13 +87,14 @@ export function TradesSuite() {
 
   function submitManualTrade(
     teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashA: number, cashB: number,
+    aPickIds: string[] = [], bPickIds: string[] = [],
   ): boolean {
     const reason = tradeBlockReason(state, teamA, teamB, aPlayers, bPlayers, cashA, cashB);
     if (reason) {
       toast.error("Trade blocked", { description: reason });
       return false;
     }
-    executeManualTrade(teamA, teamB, aPlayers, bPlayers, cashA, cashB);
+    executeManualTrade(teamA, teamB, aPlayers, bPlayers, cashA, cashB, aPickIds, bPickIds);
     toast.success("Trade completed", { description: `${teamA} ↔ ${teamB}` });
     return true;
   }
