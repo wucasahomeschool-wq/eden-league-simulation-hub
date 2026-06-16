@@ -91,6 +91,25 @@ OUTPUT FORMAT:
 - cashAReceives is $M teamB pays teamA; cashBReceives is $M teamA pays teamB. At most one is greater than 0.
 `;
 
+// Draft-time variant: picks may be packaged as assets alongside (or instead of)
+// players. Used during the Eden League Draft.
+const TRADE_RULES_PICKS = `
+Eden League is a fictional 24-team 9v9 soccer league in its OFFSEASON DRAFT. You are the league's trade market engine. Using ONLY the DATA block, propose a small set of the very best, most realistic trades between clubs. Quality over quantity — only surface genuinely smart, mutually-beneficial deals. If nothing good exists, return an empty array.
+
+ABSOLUTE RULES:
+- Use ONLY clubs, players, and draft picks that appear in the DATA. Never invent anything.
+- Each proposal is between exactly TWO clubs. Each side may send a player and/or one or more draft picks, optionally with cash. A side may send only picks (then its player field is "").
+- Draft picks are listed per club as labels like "S2 R1 (Socks)". Use those EXACT labels. A club can only trade picks it currently owns.
+- Cash is in $M and must be affordable from the paying club's transfer budget.
+- Deals must make sense for BOTH clubs (fill a need, acquire draft capital, cash in on surplus, get fair value). Avoid lopsided robberies and roster-breaking deals (never leave a club unable to field a team or over the salary cap).
+- Draft picks are especially valuable to budget-strapped clubs (rookies sign cheap $2M/2yr deals).
+
+OUTPUT FORMAT:
+- Respond with ONLY a JSON array (possibly empty), no prose, no markdown:
+[{"teamA":"<club>","teamB":"<club>","aSends":"<player on teamA or empty>","bSends":"<player on teamB or empty>","aPicks":["<pick label>"],"bPicks":["<pick label>"],"cashAReceives":<number>,"cashBReceives":<number>}]
+- aPicks/bPicks may be empty arrays. cashAReceives is $M teamB pays teamA; cashBReceives is $M teamA pays teamB. At most one cash value is greater than 0.
+`;
+
 export const generateAiTradeProposals = createServerFn({ method: "POST" })
   .inputValidator((data: GenerateInput) => {
     if (!data || typeof data.brief !== "string" || data.brief.trim().length === 0) {
