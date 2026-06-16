@@ -946,7 +946,7 @@ interface LeagueContextValue {
   generatePlayoffs: () => void;
   setPlayoffResult: (matchId: string, homeGoals: number, awayGoals: number, method: "SIM" | "MANUAL", payload?: MatchPayload) => void;
   executeTrade: (proposal: TradeProposal) => void;
-  executeManualTrade: (teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashAReceives: number, cashBReceives: number) => void;
+  executeManualTrade: (teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashAReceives: number, cashBReceives: number, aPickIds?: string[], bPickIds?: string[]) => void;
   declineTrade: (proposalId: string) => void;
   refreshTradeProposals: () => void;
   setTradeProposals: (proposals: TradeProposal[]) => void;
@@ -955,6 +955,12 @@ interface LeagueContextValue {
   setContractYears: (team: string, index: number, years: number) => void;
   signFreeAgent: (team: string, freeAgentName: string) => void;
   runContractCycle: () => ContractAction[];
+  // Draft
+  setDraftProspects: (prospects: LeaguePlayer[]) => void;
+  startDraft: () => void;
+  selectProspect: (pickId: string, prospectName: string) => void;
+  advanceDraftPick: () => void;
+  resetDraft: () => void;
   resetLeague: () => void;
   standings: StandingRow[];
   leaderboards: Leaderboards;
