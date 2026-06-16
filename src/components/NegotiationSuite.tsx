@@ -34,11 +34,31 @@ interface SessionSeed {
 
 export function NegotiationSuite() {
   const { state } = useLeague();
+  const { consumePayload, goToSuite } = useNavigation();
   const exemptList = state.settings?.contractExemptTeams ?? [];
   const isUser = (n: string) => exemptList.includes(n);
 
   const userTeams = state.teamOrder.filter(isUser);
   const [session, setSession] = useState<SessionSeed | null>(null);
+  const returnSuiteRef = useRef<string | null>(null);
+
+  // A seeded negotiation may arrive from another suite (e.g. the Draft Suite).
+  useEffect(() => {
+    const payload = consumePayload();
+    if (payload?.negotiationSeed) {
+      setSession(payload.negotiationSeed);
+      returnSuiteRef.current = payload.returnSuite ?? null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function closeSession() {
+    setSession(null);
+    const ret = returnSuiteRef.current;
+    returnSuiteRef.current = null;
+    if (ret) goToSuite(ret);
+  }
+
 
   // Proposals that involve at least one user-controlled club.
   const negotiationProposals = useMemo(
