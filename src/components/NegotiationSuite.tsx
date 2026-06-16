@@ -367,12 +367,18 @@ function NegotiationPanel({ seed, onClose }: { seed: SessionSeed; onClose: () =>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <CascadingPlayers label={`${seed.userTeam} (you) send`} team={userTeamObj} value={userSends} onChange={setUserSends} />
+            {userPickLabels.length > 0 && (
+              <p className="text-[11px] text-muted-foreground">Picks out: <span className="font-mono text-foreground">{userPickLabels.join(", ")}</span></p>
+            )}
             <p className="text-[11px] text-muted-foreground">Value out: <span className="font-mono">${userValue.toFixed(1)}M</span></p>
             <label className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">You pay ($M)</label>
             <Input type="number" min={0} step="0.1" value={cashAiReceives} onChange={(e) => setCashAiReceives(e.target.value)} className="bg-card" />
           </div>
           <div className="space-y-2">
             <CascadingPlayers label={`${seed.aiTeam} send`} team={aiTeamObj} value={aiSends} onChange={setAiSends} />
+            {aiPickLabels.length > 0 && (
+              <p className="text-[11px] text-muted-foreground">Picks out: <span className="font-mono text-foreground">{aiPickLabels.join(", ")}</span></p>
+            )}
             <p className="text-[11px] text-muted-foreground">Value out: <span className="font-mono">${aiValue.toFixed(1)}M</span></p>
             <label className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">They pay you ($M)</label>
             <Input type="number" min={0} step="0.1" value={cashUserReceives} onChange={(e) => setCashUserReceives(e.target.value)} className="bg-card" />
