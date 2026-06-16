@@ -1,7 +1,8 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useLeague, type LeagueTeam } from "@/state/league";
-import { tradeBlockReason, calculatePlayerValue, type TradeProposal } from "@/lib/trades";
+import { useNavigation } from "@/state/navigation";
+import { tradeBlockReason, calculatePlayerValue, pickLabel, type TradeProposal } from "@/lib/trades";
 import { buildNegotiationBrief } from "@/lib/negotiation-brief";
 import {
   negotiateTrade,
@@ -9,6 +10,7 @@ import {
   type NegotiationTurn,
 } from "@/lib/negotiation.functions";
 import { toast } from "sonner";
+import { PlayerSearch } from "@/components/PlayerSearch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,15 +27,38 @@ interface SessionSeed {
   aiSends: string[];
   cashUserReceives: number;
   cashAiReceives: number;
+  userPicks?: string[]; // draft pick ids the user club sends
+  aiPicks?: string[]; // draft pick ids the AI club sends
 }
+
 
 export function NegotiationSuite() {
   const { state } = useLeague();
+  const { consumePayload, goToSuite } = useNavigation();
   const exemptList = state.settings?.contractExemptTeams ?? [];
   const isUser = (n: string) => exemptList.includes(n);
 
   const userTeams = state.teamOrder.filter(isUser);
   const [session, setSession] = useState<SessionSeed | null>(null);
+  const returnSuiteRef = useRef<string | null>(null);
+
+  // A seeded negotiation may arrive from another suite (e.g. the Draft Suite).
+  useEffect(() => {
+    const payload = consumePayload();
+    if (payload?.negotiationSeed) {
+      setSession(payload.negotiationSeed);
+      returnSuiteRef.current = payload.returnSuite ?? null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function closeSession() {
+    setSession(null);
+    const ret = returnSuiteRef.current;
+    returnSuiteRef.current = null;
+    if (ret) goToSuite(ret);
+  }
+
 
   // Proposals that involve at least one user-controlled club.
   const negotiationProposals = useMemo(
@@ -60,11 +85,13 @@ export function NegotiationSuite() {
             proposalId: p.id, userTeam, aiTeam,
             userSends: [p.aSends], aiSends: [p.bSends],
             cashUserReceives: p.cashAReceives, cashAiReceives: p.cashBReceives,
+            userPicks: p.aPickIds ?? [], aiPicks: p.bPickIds ?? [],
           }
         : {
             proposalId: p.id, userTeam, aiTeam,
             userSends: [p.bSends], aiSends: [p.aSends],
             cashUserReceives: p.cashBReceives, cashAiReceives: p.cashAReceives,
+            userPicks: p.bPickIds ?? [], aiPicks: p.aPickIds ?? [],
           };
     setSession(seed);
   }
@@ -74,7 +101,7 @@ export function NegotiationSuite() {
       <NegotiationPanel
         key={`${session.userTeam}-${session.aiTeam}-${session.proposalId ?? "fresh"}`}
         seed={session}
-        onClose={() => setSession(null)}
+        onClose={closeSession}
       />
     );
   }
@@ -113,6 +140,8 @@ export function NegotiationSuite() {
           }
         />
       </section>
+
+      <PlayerSearch />
     </div>
   );
 }
@@ -216,6 +245,16 @@ function NegotiationPanel({ seed, onClose }: { seed: SessionSeed; onClose: () =>
   const [cashUserReceives, setCashUserReceives] = useState(String(seed.cashUserReceives || 0));
   const [cashAiReceives, setCashAiReceives] = useState(String(seed.cashAiReceives || 0));
 
+  // Draft picks in this deal are fixed from the seed (set in the source suite).
+  const userPickIds = useMemo(() => seed.userPicks ?? [], [seed.userPicks]);
+  const aiPickIds = useMemo(() => seed.aiPicks ?? [], [seed.aiPicks]);
+  const labelFor = (id: string) => {
+    const pk = state.draftPicks.find((p) => p.id === id);
+    return pk ? pickLabel(pk) : id;
+  };
+  const userPickLabels = userPickIds.map(labelFor);
+  const aiPickLabels = aiPickIds.map(labelFor);
+
   const [messages, setMessages] = useState<NegotiationTurn[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -230,6 +269,8 @@ function NegotiationPanel({ seed, onClose }: { seed: SessionSeed; onClose: () =>
     aiSends,
     cashUserReceives: Math.max(0, parseFloat(cashUserReceives) || 0),
     cashAiReceives: Math.max(0, parseFloat(cashAiReceives) || 0),
+    userPicks: userPickLabels,
+    aiPicks: aiPickLabels,
   };
   const sig = termsSignature(terms);
   const dealReady = agreedSignature !== null && agreedSignature === sig;
@@ -285,7 +326,7 @@ function NegotiationPanel({ seed, onClose }: { seed: SessionSeed; onClose: () =>
       terms.cashUserReceives, terms.cashAiReceives
     );
     if (reason) { toast.error("Trade blocked", { description: reason }); return; }
-    executeManualTrade(seed.userTeam, seed.aiTeam, userSends, aiSends, terms.cashUserReceives, terms.cashAiReceives);
+    executeManualTrade(seed.userTeam, seed.aiTeam, userSends, aiSends, terms.cashUserReceives, terms.cashAiReceives, userPickIds, aiPickIds);
     if (seed.proposalId) declineTrade(seed.proposalId);
     toast.success("Trade completed", { description: `${seed.userTeam} ↔ ${seed.aiTeam}` });
     onClose();
@@ -326,12 +367,18 @@ function NegotiationPanel({ seed, onClose }: { seed: SessionSeed; onClose: () =>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <CascadingPlayers label={`${seed.userTeam} (you) send`} team={userTeamObj} value={userSends} onChange={setUserSends} />
+            {userPickLabels.length > 0 && (
+              <p className="text-[11px] text-muted-foreground">Picks out: <span className="font-mono text-foreground">{userPickLabels.join(", ")}</span></p>
+            )}
             <p className="text-[11px] text-muted-foreground">Value out: <span className="font-mono">${userValue.toFixed(1)}M</span></p>
             <label className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">You pay ($M)</label>
             <Input type="number" min={0} step="0.1" value={cashAiReceives} onChange={(e) => setCashAiReceives(e.target.value)} className="bg-card" />
           </div>
           <div className="space-y-2">
             <CascadingPlayers label={`${seed.aiTeam} send`} team={aiTeamObj} value={aiSends} onChange={setAiSends} />
+            {aiPickLabels.length > 0 && (
+              <p className="text-[11px] text-muted-foreground">Picks out: <span className="font-mono text-foreground">{aiPickLabels.join(", ")}</span></p>
+            )}
             <p className="text-[11px] text-muted-foreground">Value out: <span className="font-mono">${aiValue.toFixed(1)}M</span></p>
             <label className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">They pay you ($M)</label>
             <Input type="number" min={0} step="0.1" value={cashUserReceives} onChange={(e) => setCashUserReceives(e.target.value)} className="bg-card" />

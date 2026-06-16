@@ -8,15 +8,18 @@ import { createServerFn } from "@tanstack/react-start";
 export interface AiProposedTerm {
   teamA: string;
   teamB: string;
-  aSends: string; // player name teamA gives to teamB
-  bSends: string; // player name teamB gives to teamA
+  aSends: string; // player name teamA gives to teamB ("" if none)
+  bSends: string; // player name teamB gives to teamA ("" if none)
   cashAReceives: number; // $M paid by B to A
   cashBReceives: number; // $M paid by A to B
+  aPicks?: string[]; // draft pick labels teamA gives to teamB
+  bPicks?: string[]; // draft pick labels teamB gives to teamA
 }
 
 interface GenerateInput {
   brief: string; // full-league factual digest assembled on the client
   count?: number; // desired number of proposals
+  allowPicks?: boolean; // permit draft picks as assets in proposals
 }
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -88,6 +91,25 @@ OUTPUT FORMAT:
 - cashAReceives is $M teamB pays teamA; cashBReceives is $M teamA pays teamB. At most one is greater than 0.
 `;
 
+// Draft-time variant: picks may be packaged as assets alongside (or instead of)
+// players. Used during the Eden League Draft.
+const TRADE_RULES_PICKS = `
+Eden League is a fictional 24-team 9v9 soccer league in its OFFSEASON DRAFT. You are the league's trade market engine. Using ONLY the DATA block, propose a small set of the very best, most realistic trades between clubs. Quality over quantity — only surface genuinely smart, mutually-beneficial deals. If nothing good exists, return an empty array.
+
+ABSOLUTE RULES:
+- Use ONLY clubs, players, and draft picks that appear in the DATA. Never invent anything.
+- Each proposal is between exactly TWO clubs. Each side may send a player and/or one or more draft picks, optionally with cash. A side may send only picks (then its player field is "").
+- Draft picks are listed per club as labels like "S2 R1 (Socks)". Use those EXACT labels. A club can only trade picks it currently owns.
+- Cash is in $M and must be affordable from the paying club's transfer budget.
+- Deals must make sense for BOTH clubs (fill a need, acquire draft capital, cash in on surplus, get fair value). Avoid lopsided robberies and roster-breaking deals (never leave a club unable to field a team or over the salary cap).
+- Draft picks are especially valuable to budget-strapped clubs (rookies sign cheap $2M/2yr deals).
+
+OUTPUT FORMAT:
+- Respond with ONLY a JSON array (possibly empty), no prose, no markdown:
+[{"teamA":"<club>","teamB":"<club>","aSends":"<player on teamA or empty>","bSends":"<player on teamB or empty>","aPicks":["<pick label>"],"bPicks":["<pick label>"],"cashAReceives":<number>,"cashBReceives":<number>}]
+- aPicks/bPicks may be empty arrays. cashAReceives is $M teamB pays teamA; cashBReceives is $M teamA pays teamB. At most one cash value is greater than 0.
+`;
+
 export const generateAiTradeProposals = createServerFn({ method: "POST" })
   .inputValidator((data: GenerateInput) => {
     if (!data || typeof data.brief !== "string" || data.brief.trim().length === 0) {
@@ -100,6 +122,7 @@ export const generateAiTradeProposals = createServerFn({ method: "POST" })
     if (!apiKey) throw new Error("AI is not configured");
 
     const count = Math.min(Math.max(data.count ?? 12, 4), 25);
+    const rules = data.allowPicks ? TRADE_RULES_PICKS : TRADE_RULES;
     const user = [
       `DATA (the only facts you may use):`,
       ``,
@@ -108,8 +131,11 @@ export const generateAiTradeProposals = createServerFn({ method: "POST" })
       `Propose up to ${count} of the best, most realistic trades right now. JSON array only.`,
     ].join("\n");
 
-    const content = await callGateway(apiKey, TRADE_RULES, user);
+    const content = await callGateway(apiKey, rules, user);
     const raw = extractJsonArray<Record<string, unknown>>(content) ?? [];
+
+    const asLabels = (v: unknown): string[] =>
+      Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.trim().length > 0) : [];
 
     const proposals: AiProposedTerm[] = [];
     for (const r of raw) {
@@ -117,12 +143,20 @@ export const generateAiTradeProposals = createServerFn({ method: "POST" })
       const teamB = typeof r.teamB === "string" ? r.teamB : "";
       const aSends = typeof r.aSends === "string" ? r.aSends : "";
       const bSends = typeof r.bSends === "string" ? r.bSends : "";
-      if (!teamA || !teamB || !aSends || !bSends) continue;
+      const aPicks = asLabels(r.aPicks);
+      const bPicks = asLabels(r.bPicks);
+      if (!teamA || !teamB) continue;
+      // A valid deal must move at least one asset on at least one side.
+      const hasAsset = aSends || bSends || aPicks.length || bPicks.length ||
+        Number(r.cashAReceives) > 0 || Number(r.cashBReceives) > 0;
+      if (!hasAsset) continue;
       proposals.push({
         teamA,
         teamB,
         aSends,
         bSends,
+        aPicks,
+        bPicks,
         cashAReceives: Number(r.cashAReceives) || 0,
         cashBReceives: Number(r.cashBReceives) || 0,
       });

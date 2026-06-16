@@ -1,14 +1,15 @@
 import { useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  useLeague, TRANSFER_WINDOW_LAST_WEEK, type LeagueTeam,
+  useLeague, TRANSFER_WINDOW_LAST_WEEK, type LeagueTeam, type DraftPick,
 } from "@/state/league";
 import {
   calculatePlayerValue, tradeBlockReason, buildTradeMarketBrief,
-  buildProposalFromTerms, type TradeProposal,
+  buildProposalFromTerms, pickLabel, type TradeProposal,
 } from "@/lib/trades";
 import { generateAiTradeProposals } from "@/lib/trade-ai.functions";
 import { toast } from "sonner";
+import { PlayerSearch } from "@/components/PlayerSearch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -86,13 +87,14 @@ export function TradesSuite() {
 
   function submitManualTrade(
     teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashA: number, cashB: number,
+    aPickIds: string[] = [], bPickIds: string[] = [],
   ): boolean {
     const reason = tradeBlockReason(state, teamA, teamB, aPlayers, bPlayers, cashA, cashB);
     if (reason) {
       toast.error("Trade blocked", { description: reason });
       return false;
     }
-    executeManualTrade(teamA, teamB, aPlayers, bPlayers, cashA, cashB);
+    executeManualTrade(teamA, teamB, aPlayers, bPlayers, cashA, cashB, aPickIds, bPickIds);
     toast.success("Trade completed", { description: `${teamA} ↔ ${teamB}` });
     return true;
   }
@@ -153,6 +155,8 @@ export function TradesSuite() {
         <h2 className="mb-3 text-base font-extrabold uppercase tracking-wide">Manual Trade Builder</h2>
         <ManualTrade teams={state.teamOrder.map((n) => state.teams[n])} onSubmit={submitManualTrade} />
       </section>
+
+      <PlayerSearch />
     </div>
   );
 }
@@ -162,24 +166,32 @@ function ProposalCard({
 }: {
   t: TradeProposal; onAccept: () => void; onDecline: () => void;
 }) {
+  const { state } = useLeague();
+  const labelFor = (ids?: string[]) =>
+    (ids ?? []).map((id) => {
+      const pk = state.draftPicks.find((p) => p.id === id);
+      return pk ? pickLabel(pk) : id;
+    });
+  const aPickLabels = labelFor(t.aPickIds);
+  const bPickLabels = labelFor(t.bPickIds);
   return (
     <div className="rounded-xl border bg-card p-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-lg border border-highlight-blue/40 bg-highlight-blue/5 p-3">
           <div className="text-xs font-bold uppercase tracking-wide text-highlight-blue">{t.teamA}</div>
           <p className="mt-1 text-sm">
-            Sends <span className="font-semibold">{t.aSends}</span>
+            Sends <span className="font-semibold">{t.aSends || "—"}</span>
+            {aPickLabels.length > 0 && <span className="font-mono"> + {aPickLabels.join(", ")}</span>}
             {t.cashBReceives > 0 && <> + <span className="font-mono">${t.cashBReceives}M</span></>}
           </p>
-          <p className="mt-1 text-[11px] font-mono text-success">Utility +{t.deltaUA}</p>
         </div>
         <div className="rounded-lg border border-highlight-red/40 bg-highlight-red/5 p-3">
           <div className="text-xs font-bold uppercase tracking-wide text-highlight-red">{t.teamB}</div>
           <p className="mt-1 text-sm">
-            Sends <span className="font-semibold">{t.bSends}</span>
+            Sends <span className="font-semibold">{t.bSends || "—"}</span>
+            {bPickLabels.length > 0 && <span className="font-mono"> + {bPickLabels.join(", ")}</span>}
             {t.cashAReceives > 0 && <> + <span className="font-mono">${t.cashAReceives}M</span></>}
           </p>
-          <p className="mt-1 text-[11px] font-mono text-success">Utility +{t.deltaUB}</p>
         </div>
       </div>
       <div className="mt-3 flex justify-end gap-2">
@@ -194,8 +206,9 @@ function ManualTrade({
   teams, onSubmit,
 }: {
   teams: LeagueTeam[];
-  onSubmit: (teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashA: number, cashB: number) => boolean;
+  onSubmit: (teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashA: number, cashB: number, aPickIds: string[], bPickIds: string[]) => boolean;
 }) {
+  const { state } = useLeague();
   const [teamAName, setTeamAName] = useState(teams[0].name);
   const [teamBName, setTeamBName] = useState(teams[1].name);
   const teamA = teams.find((t) => t.name === teamAName) ?? teams[0];
@@ -205,6 +218,13 @@ function ManualTrade({
   const [bPlayers, setBPlayers] = useState<string[]>([]);
   const [cashAReceives, setCashAReceives] = useState("0");
   const [cashBReceives, setCashBReceives] = useState("0");
+  const [aPicks, setAPicks] = useState<string[]>([]);
+  const [bPicks, setBPicks] = useState<string[]>([]);
+
+  const aOwnedPicks = useMemo(() => state.draftPicks.filter((p) => p.owner === teamAName), [state.draftPicks, teamAName]);
+  const bOwnedPicks = useMemo(() => state.draftPicks.filter((p) => p.owner === teamBName), [state.draftPicks, teamBName]);
+  const validAPicks = useMemo(() => aPicks.filter((id) => aOwnedPicks.some((p) => p.id === id)), [aPicks, aOwnedPicks]);
+  const validBPicks = useMemo(() => bPicks.filter((id) => bOwnedPicks.some((p) => p.id === id)), [bPicks, bOwnedPicks]);
 
   // Reset selections when a club changes so stale names don't linger.
   const aRosterKey = useMemo(() => teamA.players.map((p) => p.name).join("|"), [teamA]);
@@ -215,7 +235,12 @@ function ManualTrade({
   const sameTeam = teamAName === teamBName;
   const aValueTotal = validA.reduce((s, n) => s + (calculatePlayerValue(teamA.players.find((p) => p.name === n)!) || 0), 0);
   const bValueTotal = validB.reduce((s, n) => s + (calculatePlayerValue(teamB.players.find((p) => p.name === n)!) || 0), 0);
-  const nothing = validA.length === 0 && validB.length === 0;
+  const nothing = validA.length === 0 && validB.length === 0 && validAPicks.length === 0 && validBPicks.length === 0;
+
+  function togglePick(side: "a" | "b", id: string) {
+    if (side === "a") setAPicks((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+    else setBPicks((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  }
 
   function submit() {
     if (sameTeam || nothing) return;
@@ -223,9 +248,10 @@ function ManualTrade({
       teamAName, teamBName, validA, validB,
       Math.max(0, parseFloat(cashAReceives) || 0),
       Math.max(0, parseFloat(cashBReceives) || 0),
+      validAPicks, validBPicks,
     );
     if (!ok) return; // keep the form intact so the deal can be adjusted
-    setAPlayers([]); setBPlayers([]); setCashAReceives("0"); setCashBReceives("0");
+    setAPlayers([]); setBPlayers([]); setCashAReceives("0"); setCashBReceives("0"); setAPicks([]); setBPicks([]);
   }
 
   return (
@@ -239,6 +265,7 @@ function ManualTrade({
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cash A receives ($M)</label>
             <Input type="number" min={0} step="0.1" value={cashAReceives} onChange={(e) => setCashAReceives(e.target.value)} className="bg-card" />
           </div>
+          <PicksPicker label="A's draft picks" picks={aOwnedPicks} selected={validAPicks} onToggle={(id) => togglePick("a", id)} />
         </div>
         <div className="space-y-2">
           <TeamPicker label="Team B" value={teamBName} teams={teams} onChange={(v) => { setTeamBName(v); setBPlayers([]); }} />
@@ -248,6 +275,7 @@ function ManualTrade({
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cash B receives ($M)</label>
             <Input type="number" min={0} step="0.1" value={cashBReceives} onChange={(e) => setCashBReceives(e.target.value)} className="bg-card" />
           </div>
+          <PicksPicker label="B's draft picks" picks={bOwnedPicks} selected={validBPicks} onToggle={(id) => togglePick("b", id)} />
         </div>
       </div>
       {sameTeam && <p className="mt-2 text-xs text-destructive">Pick two different clubs.</p>}
@@ -316,6 +344,34 @@ function CascadingPlayers({
                 ))}
               </SelectContent>
             </Select>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PicksPicker({
+  label, picks, selected, onToggle,
+}: {
+  label: string; picks: DraftPick[]; selected: string[]; onToggle: (id: string) => void;
+}) {
+  if (picks.length === 0) return null;
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</label>
+      <div className="flex flex-wrap gap-1.5">
+        {picks.map((pk) => {
+          const on = selected.includes(pk.id);
+          return (
+            <button
+              key={pk.id}
+              type="button"
+              onClick={() => onToggle(pk.id)}
+              className={`rounded-md border px-2 py-1 text-[11px] font-mono transition-colors ${on ? "border-primary bg-primary/15 text-foreground" : "bg-card text-muted-foreground hover:border-border"}`}
+            >
+              {pickLabel(pk)}
+            </button>
           );
         })}
       </div>

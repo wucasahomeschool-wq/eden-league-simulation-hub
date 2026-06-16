@@ -3,6 +3,7 @@ import {
   useLeague, ATTR_KEYS, isPlayerOut, SEASON_ENDING_WEEKS,
   buildLineupSlots, isValidFormation, type AttrKey, type LineupSlot,
 } from "@/state/league";
+import { useNavigation } from "@/state/navigation";
 import { isContractExempt } from "@/lib/engine-settings";
 import { moraleLabel } from "@/lib/morale";
 import { Button } from "@/components/ui/button";
@@ -51,7 +52,15 @@ export function TeamEditorSuite() {
     setLineupSlot, setFormation, autoFillLineup, setTacticalStyle,
     setSalary, setContractYears, replaceManager,
   } = useLeague();
+  const { consumePayload } = useNavigation();
   const [team, setTeam] = useState(state.teamOrder[0]);
+
+  // Honor a "View in Team Editor" jump from another suite (e.g. Player Search).
+  useEffect(() => {
+    const payload = consumePayload();
+    if (payload?.team && state.teams[payload.team]) setTeam(payload.team);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [nameDraft, setNameDraft] = useState(team);
   const [formationDraft, setFormationDraft] = useState("3-3-2");
   const manager = state.managers?.[team];

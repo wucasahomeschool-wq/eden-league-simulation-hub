@@ -101,6 +101,35 @@ export interface PlayoffsState {
   champion?: string;
 }
 
+// ---------------- Draft ----------------
+// A tradeable draft pick. Owned by a club; ownership changes when traded.
+// The pick's board slot/order is computed at draft time from reverse standings.
+export interface DraftPick {
+  id: string;
+  season: number; // the draft (offseason) season these picks belong to
+  round: 1 | 2;
+  originalTeam: string; // club the pick originally belongs to
+  owner: string; // current owner (changes on trade)
+}
+
+// A selection made during a live draft.
+export interface DraftSelection {
+  pickId: string;
+  prospectName: string;
+  team: string; // the owner who selected
+}
+
+// Live draft state (the prospect pool + board). Reset each offseason.
+export interface DraftState {
+  season: number; // season this draft is conducting
+  prospects: LeaguePlayer[]; // the prospect pool
+  started: boolean; // board generated, drafting underway
+  order: string[]; // ordered list of pick ids (round 1 then round 2, reverse standings)
+  currentPickIndex: number; // 0-based index into order
+  selections: DraftSelection[];
+  complete: boolean;
+}
+
 export interface LeagueState {
   currentWeek: number;
   season: number;
@@ -120,6 +149,8 @@ export interface LeagueState {
   freeAgents: LeaguePlayer[]; // unattached players available for free signing
   contractsInitialized: boolean; // first-boot compliance setup complete
   settings?: EngineSettings; // editable engine tuning knobs (Settings suite)
+  draftPicks: DraftPick[]; // tradeable picks for the upcoming draft (always 48)
+  draft?: DraftState; // live draft pool/board (offseason)
 }
 
 export interface StandingRow {
@@ -330,6 +361,44 @@ export function youthPlayer(): LeaguePlayer {
   return { ...base, rating: computeOverall(base) };
 }
 
+// ---------------- Draft ----------------
+export const DRAFT_ROUNDS = 2;
+export const DRAFT_POOL_SIZE = 48; // 24 teams × 2 rounds
+
+// Build the full set of tradeable picks for a draft season — 2 rounds, every
+// club holds its own pick to start. Order/slot is computed at draft time.
+export function buildDraftPicks(teamOrder: string[], season: number): DraftPick[] {
+  const picks: DraftPick[] = [];
+  for (let round = 1 as 1 | 2; round <= DRAFT_ROUNDS; round = (round + 1) as 1 | 2) {
+    teamOrder.forEach((team, i) => {
+      picks.push({
+        id: `pick-s${season}-r${round}-${i}`,
+        season,
+        round,
+        originalTeam: team,
+        owner: team,
+      });
+    });
+  }
+  return picks;
+}
+
+// A fresh prospect for the draft pool. Health/morale fields exist (player shape)
+// but are unused in the draft UI; contract is the fixed rookie deal applied on
+// selection.
+export function prospectPlayer(): LeaguePlayer {
+  const base: LeaguePlayer = {
+    name: "NEW PROSPECT PLAYER", position: "CM", starter: false,
+    age: 19, morale: MORALE_BASELINE,
+    injuryWeeks: 0, suspensionWeeks: 0, reservedSlot: null, yellowLog: [],
+    salary: 2.0, contractYears: 2,
+    rating: 6.0, FIN: 6.0, SHO: 6.0, PAS: 6.0, VIS: 6.0, DRI: 6.0,
+    PAC: 6.0, STA: 6.0, DEF: 6.0, TAC: 6.0, POS_attr: 6.0, COM: 6.0,
+    WR: 6.0, AGG: 6.0, STR: 6.0, AER: 6.0,
+  };
+  return { ...base, rating: computeOverall(base) };
+}
+
 // Exponential injury duration: 1 week is most common, escalating up to a rare
 // season-ending blow. Only applied to players carried off (emergency-subbed).
 export function rollInjuryWeeks(): number {
@@ -391,6 +460,7 @@ export function initState(): LeagueState {
     salaryCap, freeAgents: [], contractsInitialized: true,
     managers: buildManagers(teamOrder),
     settings: { ...DEFAULT_SETTINGS, contractExemptTeams: [...DEFAULT_SETTINGS.contractExemptTeams] },
+    draftPicks: buildDraftPicks(teamOrder, 1),
   };
 }
 
@@ -469,6 +539,19 @@ function normalize(state: LeagueState): LeagueState {
     contractsInitialized,
     managers,
     settings: { ...mergedSettings, contractExemptTeams: [...mergedSettings.contractExemptTeams] },
+    // Draft picks must always exist (48). Backfill for older saves, keeping any
+    // existing ownership; if the set is missing/wrong size, rebuild from scratch.
+    draftPicks:
+      state.draftPicks && state.draftPicks.length === DRAFT_POOL_SIZE
+        ? state.draftPicks
+        : buildDraftPicks(state.teamOrder, state.season ?? 1),
+    draft: state.draft
+      ? {
+          ...state.draft,
+          prospects: (state.draft.prospects ?? []).map(normalizePlayer),
+          selections: state.draft.selections ?? [],
+        }
+      : undefined,
   };
 }
 
@@ -863,7 +946,7 @@ interface LeagueContextValue {
   generatePlayoffs: () => void;
   setPlayoffResult: (matchId: string, homeGoals: number, awayGoals: number, method: "SIM" | "MANUAL", payload?: MatchPayload) => void;
   executeTrade: (proposal: TradeProposal) => void;
-  executeManualTrade: (teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashAReceives: number, cashBReceives: number) => void;
+  executeManualTrade: (teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashAReceives: number, cashBReceives: number, aPickIds?: string[], bPickIds?: string[]) => void;
   declineTrade: (proposalId: string) => void;
   refreshTradeProposals: () => void;
   setTradeProposals: (proposals: TradeProposal[]) => void;
@@ -872,6 +955,12 @@ interface LeagueContextValue {
   setContractYears: (team: string, index: number, years: number) => void;
   signFreeAgent: (team: string, freeAgentName: string) => void;
   runContractCycle: () => ContractAction[];
+  // Draft
+  setDraftProspects: (prospects: LeaguePlayer[]) => void;
+  startDraft: () => void;
+  selectProspect: (pickId: string, prospectName: string) => void;
+  advanceDraftPick: () => void;
+  resetDraft: () => void;
   resetLeague: () => void;
   standings: StandingRow[];
   leaderboards: Leaderboards;
@@ -960,7 +1049,9 @@ function moveTrade(
   aPlayers: string[],
   bPlayers: string[],
   cashAReceives: number,
-  cashBReceives: number
+  cashBReceives: number,
+  aPickIds: string[] = [],
+  bPickIds: string[] = []
 ): LeagueState {
   if (aName === bName) return prev;
   const teamA = prev.teams[aName];
@@ -969,9 +1060,16 @@ function moveTrade(
 
   const aSet = new Set(aPlayers.filter(Boolean));
   const bSet = new Set(bPlayers.filter(Boolean));
+  const aPickSet = new Set(aPickIds.filter(Boolean));
+  const bPickSet = new Set(bPickIds.filter(Boolean));
   const movingFromA = teamA.players.filter((p) => aSet.has(p.name)).map((p) => ({ ...p, starter: false, reservedSlot: null }));
   const movingFromB = teamB.players.filter((p) => bSet.has(p.name)).map((p) => ({ ...p, starter: false, reservedSlot: null }));
-  if (!movingFromA.length && !movingFromB.length && cashAReceives === 0 && cashBReceives === 0) return prev;
+  const noAssets =
+    !movingFromA.length && !movingFromB.length && cashAReceives === 0 &&
+    cashBReceives === 0 && aPickSet.size === 0 && bPickSet.size === 0;
+  if (noAssets) return prev;
+
+
 
   const aBudgetBefore = parseBudget(teamA.budget);
   const bBudgetBefore = parseBudget(teamB.budget);
@@ -1035,10 +1133,19 @@ function moveTrade(
     return prev;
   }
 
+  // Reassign traded draft picks: A's picks go to B, B's picks go to A. Only
+  // picks the sending club currently owns can move.
+  const draftPicks = prev.draftPicks.map((pk) => {
+    if (aPickSet.has(pk.id) && pk.owner === aName) return { ...pk, owner: bName };
+    if (bPickSet.has(pk.id) && pk.owner === bName) return { ...pk, owner: aName };
+    return pk;
+  });
+
   return {
     ...prev,
     teams: { ...prev.teams, [aName]: aTeam, [bName]: bTeam },
     managers: withPendingSacks(prev.managers),
+    draftPicks,
   };
 }
 
@@ -1458,7 +1565,12 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
           teamA: t.teamA === oldName ? trimmed : t.teamA,
           teamB: t.teamB === oldName ? trimmed : t.teamB,
         }));
-        return { ...prev, teamOrder, teams, fixtures, playoffs, tradeProposals };
+        const draftPicks = prev.draftPicks.map((pk) => ({
+          ...pk,
+          originalTeam: pk.originalTeam === oldName ? trimmed : pk.originalTeam,
+          owner: pk.owner === oldName ? trimmed : pk.owner,
+        }));
+        return { ...prev, teamOrder, teams, fixtures, playoffs, tradeProposals, draftPicks };
       }),
     addFixtures: (entries) =>
       update((prev) => {
@@ -1515,6 +1627,8 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
           playoffs: undefined,
           tradeProposals: [],
           teams,
+          draftPicks: buildDraftPicks(prev.teamOrder, season),
+          draft: undefined,
         };
       }),
     startNewSeason: () =>
@@ -1533,6 +1647,8 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
           playoffs: undefined,
           tradeProposals: [],
           teams,
+          draftPicks: buildDraftPicks(prev.teamOrder, prev.season + 1),
+          draft: undefined,
         };
       }),
     generatePlayoffs: () =>
@@ -1572,13 +1688,14 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         const next = moveTrade(
           prev, proposal.teamA, proposal.teamB,
           [proposal.aSends], [proposal.bSends],
-          proposal.cashAReceives, proposal.cashBReceives
+          proposal.cashAReceives, proposal.cashBReceives,
+          proposal.aPickIds ?? [], proposal.bPickIds ?? []
         );
         if (next === prev) return prev;
         return { ...next, tradeProposals: next.tradeProposals.filter((t) => t.id !== proposal.id) };
       }),
-    executeManualTrade: (teamA, teamB, aPlayers, bPlayers, cashAReceives, cashBReceives) =>
-      update((prev) => moveTrade(prev, teamA, teamB, aPlayers, bPlayers, cashAReceives, cashBReceives)),
+    executeManualTrade: (teamA, teamB, aPlayers, bPlayers, cashAReceives, cashBReceives, aPickIds = [], bPickIds = []) =>
+      update((prev) => moveTrade(prev, teamA, teamB, aPlayers, bPlayers, cashAReceives, cashBReceives, aPickIds, bPickIds)),
     declineTrade: (proposalId) =>
       update((prev) => ({
         ...prev,
@@ -1694,6 +1811,87 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         // pre-contracts snapshot must not trigger a salary-resetting re-init.
         contractsInitialized: prev.contractsInitialized,
       })),
+    setDraftProspects: (prospects) =>
+      update((prev) => {
+        const base: DraftState = prev.draft ?? {
+          season: prev.season,
+          prospects: [],
+          started: false,
+          order: [],
+          currentPickIndex: 0,
+          selections: [],
+          complete: false,
+        };
+        return { ...prev, draft: { ...base, prospects } };
+      }),
+    startDraft: () =>
+      update((prev) => {
+        if (!prev.draft || prev.draft.prospects.length < DRAFT_POOL_SIZE) return prev;
+        if (prev.draft.started) return prev;
+        // Draft order = reverse final standings (last place picks first), same
+        // order for both rounds.
+        const standings = computeStandings(prev);
+        const rankOf = (team: string) => standings.find((s) => s.team === team)?.rank ?? 99;
+        const order = [...prev.draftPicks]
+          .sort((a, b) => {
+            if (a.round !== b.round) return a.round - b.round;
+            return rankOf(b.originalTeam) - rankOf(a.originalTeam); // worst (higher rank #) first
+          })
+          .map((pk) => pk.id);
+        return {
+          ...prev,
+          draft: { ...prev.draft, started: true, order, currentPickIndex: 0, complete: false },
+        };
+      }),
+    selectProspect: (pickId, prospectName) =>
+      update((prev) => {
+        const draft = prev.draft;
+        if (!draft || !draft.started || draft.complete) return prev;
+        const pick = prev.draftPicks.find((pk) => pk.id === pickId);
+        if (!pick) return prev;
+        const owner = pick.owner;
+        const team = prev.teams[owner];
+        const prospect = draft.prospects.find((p) => p.name === prospectName);
+        if (!team || !prospect) return prev;
+
+        // Rookie contract is fixed: $2M / 2 years regardless of skill or pick.
+        const rookie: LeaguePlayer = {
+          ...prospect,
+          starter: false,
+          reservedSlot: null,
+          injuryWeeks: 0,
+          suspensionWeeks: 0,
+          yellowLog: [],
+          morale: MORALE_BASELINE,
+          salary: 2.0,
+          contractYears: 2,
+        };
+        let updatedTeam: LeagueTeam = { ...team, players: [...team.players, rookie] };
+        // Auto-slot into the XI if good enough, exactly like an acquired player.
+        updatedTeam = repairLineup(autoPromote(updatedTeam, [rookie]));
+
+        const prospects = draft.prospects.filter((p) => p.name !== prospectName);
+        const selections = [...draft.selections, { pickId, prospectName, team: owner }];
+        const nextIndex = draft.currentPickIndex + 1;
+        const complete = nextIndex >= draft.order.length;
+        return {
+          ...prev,
+          teams: { ...prev.teams, [owner]: updatedTeam },
+          draft: { ...draft, prospects, selections, currentPickIndex: nextIndex, complete },
+        };
+      }),
+    advanceDraftPick: () =>
+      update((prev) => {
+        const draft = prev.draft;
+        if (!draft || !draft.started || draft.complete) return prev;
+        const nextIndex = draft.currentPickIndex + 1;
+        return {
+          ...prev,
+          draft: { ...draft, currentPickIndex: nextIndex, complete: nextIndex >= draft.order.length },
+        };
+      }),
+    resetDraft: () =>
+      update((prev) => ({ ...prev, draft: undefined })),
     resetLeague: () => update(() => initState()), // routed through update() so a full reset is undoable
   };
 
