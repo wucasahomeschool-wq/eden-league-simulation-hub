@@ -32,7 +32,9 @@ export const Route = createFileRoute("/")({
   }),
   component: () => (
     <LeagueProvider>
-      <Hub />
+      <NavigationProvider suites={SUITES.map((s) => s.name)}>
+        <Hub />
+      </NavigationProvider>
     </LeagueProvider>
   ),
 });
@@ -43,6 +45,7 @@ const SUITES = [
   { name: "Team Editor", render: () => <TeamEditorSuite /> },
   { name: "Trades", render: () => <TradesSuite /> },
   { name: "Negotiation", render: () => <NegotiationSuite /> },
+  { name: "Draft", render: () => <DraftSuite /> },
   { name: "Simulation Terminal", render: () => <SimulationTerminal /> },
   { name: "Playoffs", render: () => <PlayoffsSuite /> },
   { name: "Contracts", render: () => <ContractsSuite /> },
@@ -52,12 +55,9 @@ const SUITES = [
 ];
 
 function Hub() {
-  const [idx, setIdx] = useState(0);
+  const { index: idx, next, prev } = useNavigation();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-
-  const prev = () => setIdx((i) => (i - 1 + SUITES.length) % SUITES.length);
-  const next = () => setIdx((i) => (i + 1) % SUITES.length);
 
   return (
     <div className="min-h-screen">
