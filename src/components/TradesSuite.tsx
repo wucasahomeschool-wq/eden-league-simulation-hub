@@ -265,6 +265,7 @@ function ManualTrade({
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cash A receives ($M)</label>
             <Input type="number" min={0} step="0.1" value={cashAReceives} onChange={(e) => setCashAReceives(e.target.value)} className="bg-card" />
           </div>
+          <PicksPicker label="A's draft picks" picks={aOwnedPicks} selected={validAPicks} onToggle={(id) => togglePick("a", id)} />
         </div>
         <div className="space-y-2">
           <TeamPicker label="Team B" value={teamBName} teams={teams} onChange={(v) => { setTeamBName(v); setBPlayers([]); }} />
@@ -274,6 +275,7 @@ function ManualTrade({
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cash B receives ($M)</label>
             <Input type="number" min={0} step="0.1" value={cashBReceives} onChange={(e) => setCashBReceives(e.target.value)} className="bg-card" />
           </div>
+          <PicksPicker label="B's draft picks" picks={bOwnedPicks} selected={validBPicks} onToggle={(id) => togglePick("b", id)} />
         </div>
       </div>
       {sameTeam && <p className="mt-2 text-xs text-destructive">Pick two different clubs.</p>}
