@@ -164,9 +164,11 @@ export const negotiateTrade = createServerFn({ method: "POST" })
         ? data.userManagerName.trim()
         : null;
 
+    const mood = MOODS[Math.floor(Math.random() * MOODS.length)];
     const system =
       `You are ${data.managerName}, manager of ${data.terms.aiTeam} in the Eden League.\n` +
       `YOUR PERSONALITY: ${data.personality}\n` +
+      `YOUR CURRENT MOOD (subtle, do not announce): ${mood}\n` +
       (counterpart
         ? `You are negotiating with ${counterpart}, the manager of ${data.terms.userTeam}. Address them by name (${counterpart}) in your replies.\n`
         : "") +
