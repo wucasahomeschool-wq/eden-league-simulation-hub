@@ -350,3 +350,31 @@ function CascadingPlayers({
     </div>
   );
 }
+
+function PicksPicker({
+  label, picks, selected, onToggle,
+}: {
+  label: string; picks: DraftPick[]; selected: string[]; onToggle: (id: string) => void;
+}) {
+  if (picks.length === 0) return null;
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</label>
+      <div className="flex flex-wrap gap-1.5">
+        {picks.map((pk) => {
+          const on = selected.includes(pk.id);
+          return (
+            <button
+              key={pk.id}
+              type="button"
+              onClick={() => onToggle(pk.id)}
+              className={`rounded-md border px-2 py-1 text-[11px] font-mono transition-colors ${on ? "border-primary bg-primary/15 text-foreground" : "bg-card text-muted-foreground hover:border-border"}`}
+            >
+              {pickLabel(pk)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
