@@ -166,20 +166,30 @@ function ProposalCard({
 }: {
   t: TradeProposal; onAccept: () => void; onDecline: () => void;
 }) {
+  const { state } = useLeague();
+  const labelFor = (ids?: string[]) =>
+    (ids ?? []).map((id) => {
+      const pk = state.draftPicks.find((p) => p.id === id);
+      return pk ? pickLabel(pk) : id;
+    });
+  const aPickLabels = labelFor(t.aPickIds);
+  const bPickLabels = labelFor(t.bPickIds);
   return (
     <div className="rounded-xl border bg-card p-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-lg border border-highlight-blue/40 bg-highlight-blue/5 p-3">
           <div className="text-xs font-bold uppercase tracking-wide text-highlight-blue">{t.teamA}</div>
           <p className="mt-1 text-sm">
-            Sends <span className="font-semibold">{t.aSends}</span>
+            Sends <span className="font-semibold">{t.aSends || "—"}</span>
+            {aPickLabels.length > 0 && <span className="font-mono"> + {aPickLabels.join(", ")}</span>}
             {t.cashBReceives > 0 && <> + <span className="font-mono">${t.cashBReceives}M</span></>}
           </p>
         </div>
         <div className="rounded-lg border border-highlight-red/40 bg-highlight-red/5 p-3">
           <div className="text-xs font-bold uppercase tracking-wide text-highlight-red">{t.teamB}</div>
           <p className="mt-1 text-sm">
-            Sends <span className="font-semibold">{t.bSends}</span>
+            Sends <span className="font-semibold">{t.bSends || "—"}</span>
+            {bPickLabels.length > 0 && <span className="font-mono"> + {bPickLabels.join(", ")}</span>}
             {t.cashAReceives > 0 && <> + <span className="font-mono">${t.cashAReceives}M</span></>}
           </p>
         </div>
