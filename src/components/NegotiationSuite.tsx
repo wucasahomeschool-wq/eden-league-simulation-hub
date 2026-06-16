@@ -27,7 +27,10 @@ interface SessionSeed {
   aiSends: string[];
   cashUserReceives: number;
   cashAiReceives: number;
+  userPicks?: string[]; // draft pick ids the user club sends
+  aiPicks?: string[]; // draft pick ids the AI club sends
 }
+
 
 export function NegotiationSuite() {
   const { state } = useLeague();
