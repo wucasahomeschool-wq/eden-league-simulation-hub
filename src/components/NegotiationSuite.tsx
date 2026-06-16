@@ -245,6 +245,16 @@ function NegotiationPanel({ seed, onClose }: { seed: SessionSeed; onClose: () =>
   const [cashUserReceives, setCashUserReceives] = useState(String(seed.cashUserReceives || 0));
   const [cashAiReceives, setCashAiReceives] = useState(String(seed.cashAiReceives || 0));
 
+  // Draft picks in this deal are fixed from the seed (set in the source suite).
+  const userPickIds = useMemo(() => seed.userPicks ?? [], [seed.userPicks]);
+  const aiPickIds = useMemo(() => seed.aiPicks ?? [], [seed.aiPicks]);
+  const labelFor = (id: string) => {
+    const pk = state.draftPicks.find((p) => p.id === id);
+    return pk ? pickLabel(pk) : id;
+  };
+  const userPickLabels = userPickIds.map(labelFor);
+  const aiPickLabels = aiPickIds.map(labelFor);
+
   const [messages, setMessages] = useState<NegotiationTurn[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -259,6 +269,8 @@ function NegotiationPanel({ seed, onClose }: { seed: SessionSeed; onClose: () =>
     aiSends,
     cashUserReceives: Math.max(0, parseFloat(cashUserReceives) || 0),
     cashAiReceives: Math.max(0, parseFloat(cashAiReceives) || 0),
+    userPicks: userPickLabels,
+    aiPicks: aiPickLabels,
   };
   const sig = termsSignature(terms);
   const dealReady = agreedSignature !== null && agreedSignature === sig;
