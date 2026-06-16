@@ -1802,6 +1802,87 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         // pre-contracts snapshot must not trigger a salary-resetting re-init.
         contractsInitialized: prev.contractsInitialized,
       })),
+    setDraftProspects: (prospects) =>
+      update((prev) => {
+        const base: DraftState = prev.draft ?? {
+          season: prev.season,
+          prospects: [],
+          started: false,
+          order: [],
+          currentPickIndex: 0,
+          selections: [],
+          complete: false,
+        };
+        return { ...prev, draft: { ...base, prospects } };
+      }),
+    startDraft: () =>
+      update((prev) => {
+        if (!prev.draft || prev.draft.prospects.length < DRAFT_POOL_SIZE) return prev;
+        if (prev.draft.started) return prev;
+        // Draft order = reverse final standings (last place picks first), same
+        // order for both rounds.
+        const standings = computeStandings(prev);
+        const rankOf = (team: string) => standings.find((s) => s.team === team)?.rank ?? 99;
+        const order = [...prev.draftPicks]
+          .sort((a, b) => {
+            if (a.round !== b.round) return a.round - b.round;
+            return rankOf(b.originalTeam) - rankOf(a.originalTeam); // worst (higher rank #) first
+          })
+          .map((pk) => pk.id);
+        return {
+          ...prev,
+          draft: { ...prev.draft, started: true, order, currentPickIndex: 0, complete: false },
+        };
+      }),
+    selectProspect: (pickId, prospectName) =>
+      update((prev) => {
+        const draft = prev.draft;
+        if (!draft || !draft.started || draft.complete) return prev;
+        const pick = prev.draftPicks.find((pk) => pk.id === pickId);
+        if (!pick) return prev;
+        const owner = pick.owner;
+        const team = prev.teams[owner];
+        const prospect = draft.prospects.find((p) => p.name === prospectName);
+        if (!team || !prospect) return prev;
+
+        // Rookie contract is fixed: $2M / 2 years regardless of skill or pick.
+        const rookie: LeaguePlayer = {
+          ...prospect,
+          starter: false,
+          reservedSlot: null,
+          injuryWeeks: 0,
+          suspensionWeeks: 0,
+          yellowLog: [],
+          morale: MORALE_BASELINE,
+          salary: 2.0,
+          contractYears: 2,
+        };
+        let updatedTeam: LeagueTeam = { ...team, players: [...team.players, rookie] };
+        // Auto-slot into the XI if good enough, exactly like an acquired player.
+        updatedTeam = repairLineup(autoPromote(updatedTeam, [rookie]));
+
+        const prospects = draft.prospects.filter((p) => p.name !== prospectName);
+        const selections = [...draft.selections, { pickId, prospectName, team: owner }];
+        const nextIndex = draft.currentPickIndex + 1;
+        const complete = nextIndex >= draft.order.length;
+        return {
+          ...prev,
+          teams: { ...prev.teams, [owner]: updatedTeam },
+          draft: { ...draft, prospects, selections, currentPickIndex: nextIndex, complete },
+        };
+      }),
+    advanceDraftPick: () =>
+      update((prev) => {
+        const draft = prev.draft;
+        if (!draft || !draft.started || draft.complete) return prev;
+        const nextIndex = draft.currentPickIndex + 1;
+        return {
+          ...prev,
+          draft: { ...draft, currentPickIndex: nextIndex, complete: nextIndex >= draft.order.length },
+        };
+      }),
+    resetDraft: () =>
+      update((prev) => ({ ...prev, draft: undefined })),
     resetLeague: () => update(() => initState()), // routed through update() so a full reset is undoable
   };
 
