@@ -9,6 +9,7 @@ import {
 } from "@/lib/trades";
 import { generateAiTradeProposals } from "@/lib/trade-ai.functions";
 import { toast } from "sonner";
+import { PlayerSearch } from "@/components/PlayerSearch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
