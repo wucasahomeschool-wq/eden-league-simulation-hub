@@ -19,6 +19,7 @@ export interface AiProposedTerm {
 interface GenerateInput {
   brief: string; // full-league factual digest assembled on the client
   count?: number; // desired number of proposals
+  allowPicks?: boolean; // permit draft picks as assets in proposals
 }
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
