@@ -8,10 +8,12 @@ import { createServerFn } from "@tanstack/react-start";
 export interface AiProposedTerm {
   teamA: string;
   teamB: string;
-  aSends: string; // player name teamA gives to teamB
-  bSends: string; // player name teamB gives to teamA
+  aSends: string; // player name teamA gives to teamB ("" if none)
+  bSends: string; // player name teamB gives to teamA ("" if none)
   cashAReceives: number; // $M paid by B to A
   cashBReceives: number; // $M paid by A to B
+  aPicks?: string[]; // draft pick labels teamA gives to teamB
+  bPicks?: string[]; // draft pick labels teamB gives to teamA
 }
 
 interface GenerateInput {
