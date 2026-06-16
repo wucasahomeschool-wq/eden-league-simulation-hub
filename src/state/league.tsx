@@ -1127,10 +1127,19 @@ function moveTrade(
     return prev;
   }
 
+  // Reassign traded draft picks: A's picks go to B, B's picks go to A. Only
+  // picks the sending club currently owns can move.
+  const draftPicks = prev.draftPicks.map((pk) => {
+    if (aPickSet.has(pk.id) && pk.owner === aName) return { ...pk, owner: bName };
+    if (bPickSet.has(pk.id) && pk.owner === bName) return { ...pk, owner: aName };
+    return pk;
+  });
+
   return {
     ...prev,
     teams: { ...prev.teams, [aName]: aTeam, [bName]: bTeam },
     managers: withPendingSacks(prev.managers),
+    draftPicks,
   };
 }
 
