@@ -153,6 +153,8 @@ export function TradesSuite() {
         <h2 className="mb-3 text-base font-extrabold uppercase tracking-wide">Manual Trade Builder</h2>
         <ManualTrade teams={state.teamOrder.map((n) => state.teams[n])} onSubmit={submitManualTrade} />
       </section>
+
+      <PlayerSearch />
     </div>
   );
 }
