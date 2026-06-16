@@ -5,7 +5,7 @@ import {
 } from "@/state/league";
 import {
   calculatePlayerValue, tradeBlockReason, buildTradeMarketBrief,
-  buildProposalFromTerms, type TradeProposal,
+  buildProposalFromTerms, pickLabel, type TradeProposal,
 } from "@/lib/trades";
 import { generateAiTradeProposals } from "@/lib/trade-ai.functions";
 import { toast } from "sonner";
