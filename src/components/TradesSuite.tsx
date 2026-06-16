@@ -171,7 +171,6 @@ function ProposalCard({
             Sends <span className="font-semibold">{t.aSends}</span>
             {t.cashBReceives > 0 && <> + <span className="font-mono">${t.cashBReceives}M</span></>}
           </p>
-          <p className="mt-1 text-[11px] font-mono text-success">Utility +{t.deltaUA}</p>
         </div>
         <div className="rounded-lg border border-highlight-red/40 bg-highlight-red/5 p-3">
           <div className="text-xs font-bold uppercase tracking-wide text-highlight-red">{t.teamB}</div>
@@ -179,7 +178,6 @@ function ProposalCard({
             Sends <span className="font-semibold">{t.bSends}</span>
             {t.cashAReceives > 0 && <> + <span className="font-mono">${t.cashAReceives}M</span></>}
           </p>
-          <p className="mt-1 text-[11px] font-mono text-success">Utility +{t.deltaUB}</p>
         </div>
       </div>
       <div className="mt-3 flex justify-end gap-2">
