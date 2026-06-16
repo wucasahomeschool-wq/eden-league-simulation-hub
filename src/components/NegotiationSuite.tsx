@@ -1,7 +1,8 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useLeague, type LeagueTeam } from "@/state/league";
-import { tradeBlockReason, calculatePlayerValue, type TradeProposal } from "@/lib/trades";
+import { useNavigation } from "@/state/navigation";
+import { tradeBlockReason, calculatePlayerValue, pickLabel, type TradeProposal } from "@/lib/trades";
 import { buildNegotiationBrief } from "@/lib/negotiation-brief";
 import {
   negotiateTrade,
