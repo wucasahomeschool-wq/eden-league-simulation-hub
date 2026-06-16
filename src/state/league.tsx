@@ -101,6 +101,35 @@ export interface PlayoffsState {
   champion?: string;
 }
 
+// ---------------- Draft ----------------
+// A tradeable draft pick. Owned by a club; ownership changes when traded.
+// The pick's board slot/order is computed at draft time from reverse standings.
+export interface DraftPick {
+  id: string;
+  season: number; // the draft (offseason) season these picks belong to
+  round: 1 | 2;
+  originalTeam: string; // club the pick originally belongs to
+  owner: string; // current owner (changes on trade)
+}
+
+// A selection made during a live draft.
+export interface DraftSelection {
+  pickId: string;
+  prospectName: string;
+  team: string; // the owner who selected
+}
+
+// Live draft state (the prospect pool + board). Reset each offseason.
+export interface DraftState {
+  season: number; // season this draft is conducting
+  prospects: LeaguePlayer[]; // the prospect pool
+  started: boolean; // board generated, drafting underway
+  order: string[]; // ordered list of pick ids (round 1 then round 2, reverse standings)
+  currentPickIndex: number; // 0-based index into order
+  selections: DraftSelection[];
+  complete: boolean;
+}
+
 export interface LeagueState {
   currentWeek: number;
   season: number;
@@ -120,6 +149,8 @@ export interface LeagueState {
   freeAgents: LeaguePlayer[]; // unattached players available for free signing
   contractsInitialized: boolean; // first-boot compliance setup complete
   settings?: EngineSettings; // editable engine tuning knobs (Settings suite)
+  draftPicks: DraftPick[]; // tradeable picks for the upcoming draft (always 48)
+  draft?: DraftState; // live draft pool/board (offseason)
 }
 
 export interface StandingRow {
