@@ -326,7 +326,7 @@ function NegotiationPanel({ seed, onClose }: { seed: SessionSeed; onClose: () =>
       terms.cashUserReceives, terms.cashAiReceives
     );
     if (reason) { toast.error("Trade blocked", { description: reason }); return; }
-    executeManualTrade(seed.userTeam, seed.aiTeam, userSends, aiSends, terms.cashUserReceives, terms.cashAiReceives);
+    executeManualTrade(seed.userTeam, seed.aiTeam, userSends, aiSends, terms.cashUserReceives, terms.cashAiReceives, userPickIds, aiPickIds);
     if (seed.proposalId) declineTrade(seed.proposalId);
     toast.success("Trade completed", { description: `${seed.userTeam} ↔ ${seed.aiTeam}` });
     onClose();
