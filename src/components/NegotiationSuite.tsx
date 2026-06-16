@@ -114,6 +114,8 @@ export function NegotiationSuite() {
           }
         />
       </section>
+
+      <PlayerSearch />
     </div>
   );
 }
