@@ -1679,13 +1679,14 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         const next = moveTrade(
           prev, proposal.teamA, proposal.teamB,
           [proposal.aSends], [proposal.bSends],
-          proposal.cashAReceives, proposal.cashBReceives
+          proposal.cashAReceives, proposal.cashBReceives,
+          proposal.aPickIds ?? [], proposal.bPickIds ?? []
         );
         if (next === prev) return prev;
         return { ...next, tradeProposals: next.tradeProposals.filter((t) => t.id !== proposal.id) };
       }),
-    executeManualTrade: (teamA, teamB, aPlayers, bPlayers, cashAReceives, cashBReceives) =>
-      update((prev) => moveTrade(prev, teamA, teamB, aPlayers, bPlayers, cashAReceives, cashBReceives)),
+    executeManualTrade: (teamA, teamB, aPlayers, bPlayers, cashAReceives, cashBReceives, aPickIds = [], bPickIds = []) =>
+      update((prev) => moveTrade(prev, teamA, teamB, aPlayers, bPlayers, cashAReceives, cashBReceives, aPickIds, bPickIds)),
     declineTrade: (proposalId) =>
       update((prev) => ({
         ...prev,
