@@ -1565,7 +1565,12 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
           teamA: t.teamA === oldName ? trimmed : t.teamA,
           teamB: t.teamB === oldName ? trimmed : t.teamB,
         }));
-        return { ...prev, teamOrder, teams, fixtures, playoffs, tradeProposals };
+        const draftPicks = prev.draftPicks.map((pk) => ({
+          ...pk,
+          originalTeam: pk.originalTeam === oldName ? trimmed : pk.originalTeam,
+          owner: pk.owner === oldName ? trimmed : pk.owner,
+        }));
+        return { ...prev, teamOrder, teams, fixtures, playoffs, tradeProposals, draftPicks };
       }),
     addFixtures: (entries) =>
       update((prev) => {
