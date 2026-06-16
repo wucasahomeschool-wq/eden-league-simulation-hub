@@ -204,7 +204,10 @@ export interface TradeProposal {
   cashBReceives: number; // $M paid by A to B
   deltaUA: number;
   deltaUB: number;
+  aPickIds?: string[]; // draft pick ids A sends to B
+  bPickIds?: string[]; // draft pick ids B sends to A
 }
+
 
 function sample<T>(arr: T[], k: number): T[] {
   const copy = [...arr];
