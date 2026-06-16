@@ -460,6 +460,7 @@ export function initState(): LeagueState {
     salaryCap, freeAgents: [], contractsInitialized: true,
     managers: buildManagers(teamOrder),
     settings: { ...DEFAULT_SETTINGS, contractExemptTeams: [...DEFAULT_SETTINGS.contractExemptTeams] },
+    draftPicks: buildDraftPicks(teamOrder, 1),
   };
 }
 
