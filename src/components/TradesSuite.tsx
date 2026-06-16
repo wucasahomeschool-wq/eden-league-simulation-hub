@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  useLeague, TRANSFER_WINDOW_LAST_WEEK, type LeagueTeam,
+  useLeague, TRANSFER_WINDOW_LAST_WEEK, type LeagueTeam, type DraftPick,
 } from "@/state/league";
 import {
   calculatePlayerValue, tradeBlockReason, buildTradeMarketBrief,
