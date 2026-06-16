@@ -14,6 +14,8 @@ export interface NegotiationTerms {
   aiSends: string[]; // player names the AI club gives up
   cashUserReceives: number; // $M paid by AI club to user club
   cashAiReceives: number; // $M paid by user club to AI club
+  userPicks?: string[]; // draft pick labels the user club gives up
+  aiPicks?: string[]; // draft pick labels the AI club gives up
 }
 
 export interface NegotiationTurn {
