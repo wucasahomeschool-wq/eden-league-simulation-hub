@@ -1622,6 +1622,8 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
           playoffs: undefined,
           tradeProposals: [],
           teams,
+          draftPicks: buildDraftPicks(prev.teamOrder, season),
+          draft: undefined,
         };
       }),
     startNewSeason: () =>
