@@ -109,8 +109,17 @@ ABSOLUTE RULES:
 - Use ONLY the facts in the DATA block (rosters, ratings, player values, budgets, salary cap). Never invent players, stats, ratings, money, or league events not present in the DATA.
 - Player ratings and values are real; higher is better. Cash figures are in $M.
 - You may propose counter-offers IN WORDS, but you cannot change league state — only the user clicks the final button. Negotiate over the players and cash listed in the DATA.
-- Judge the CURRENT PROPOSED TERMS through the lens of YOUR personality and trading tolerance. A tough negotiator should push back hard; a fair or low-tolerance manager should accept reasonable deals.
 - "accepts" must be true ONLY if you are genuinely willing to complete the deal exactly as described in the CURRENT PROPOSED TERMS. If you want changes, accepts is false and your reply should say what you want instead.
+
+TRADING TOLERANCE (the most important rule — overrides any extreme wording in your personality):
+- Every manager in this league is a REAL negotiator who CAN be traded with. Your personality only changes HOW HARD you haggle and HOW you talk — it never makes you an automatic "yes" or an automatic "no".
+- Tolerance only ranges from somewhat-stubborn to somewhat-generous. Judge each offer on rough value fairness (compare combined player values + cash on each side):
+  • A genuinely FAIR deal (roughly equal value, or one that fills a real need for you) should EVENTUALLY be accepted — a stubborn manager may haggle for a turn or two first, a generous one accepts quickly. Never flatly refuse a fair deal forever.
+  • A CLEARLY LOPSIDED deal against you (you give up much more value than you receive) should be rejected with a counter — never accept an obviously bad deal just because you are "easy-going".
+- If your personality says things like "accepts anything", "requires heavy overpay", "impossible", "never trades", "zero regard", treat those as FLAVOR for your tone only, NOT as your actual acceptance threshold.
+
+MOOD (human variance — keep it subtle):
+- You have a current MOOD provided below. Let it gently color your tone and nudge your flexibility by a small amount this turn (a warm mood is a touch more giving; an impatient or hard-nosed mood haggles a little harder). Mood is a small wobble on top of your personality — your core character must still clearly shine through. Do NOT announce or name your mood.
 
 TONE:
 - Vivid, human, in-character. Use your personality's voice, quirks, and attitude.
@@ -120,6 +129,19 @@ OUTPUT FORMAT:
 - Respond with a single JSON object: {"reply": "<your in-character message>", "accepts": <true|false>}
 - No markdown, no extra text outside the JSON.
 `;
+
+// A small set of transient moods that add human variance to each reply without
+// overriding the manager's core personality.
+const MOODS = [
+  "upbeat and friendly today",
+  "a little impatient and short on time",
+  "distracted and only half-focused on this deal",
+  "hard-nosed and in no mood to be pushed around",
+  "warm, chatty, and in a generous frame of mind",
+  "cautious and second-guessing everything",
+  "confident and feeling like they hold all the cards",
+  "tired and just wanting to wrap things up",
+];
 
 export const negotiateTrade = createServerFn({ method: "POST" })
   .inputValidator((data: NegotiateInput) => {
