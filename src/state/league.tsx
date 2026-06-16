@@ -361,6 +361,44 @@ export function youthPlayer(): LeaguePlayer {
   return { ...base, rating: computeOverall(base) };
 }
 
+// ---------------- Draft ----------------
+export const DRAFT_ROUNDS = 2;
+export const DRAFT_POOL_SIZE = 48; // 24 teams × 2 rounds
+
+// Build the full set of tradeable picks for a draft season — 2 rounds, every
+// club holds its own pick to start. Order/slot is computed at draft time.
+export function buildDraftPicks(teamOrder: string[], season: number): DraftPick[] {
+  const picks: DraftPick[] = [];
+  for (let round = 1 as 1 | 2; round <= DRAFT_ROUNDS; round = (round + 1) as 1 | 2) {
+    teamOrder.forEach((team, i) => {
+      picks.push({
+        id: `pick-s${season}-r${round}-${i}`,
+        season,
+        round,
+        originalTeam: team,
+        owner: team,
+      });
+    });
+  }
+  return picks;
+}
+
+// A fresh prospect for the draft pool. Health/morale fields exist (player shape)
+// but are unused in the draft UI; contract is the fixed rookie deal applied on
+// selection.
+export function prospectPlayer(): LeaguePlayer {
+  const base: LeaguePlayer = {
+    name: "NEW PROSPECT PLAYER", position: "CM", starter: false,
+    age: 19, morale: MORALE_BASELINE,
+    injuryWeeks: 0, suspensionWeeks: 0, reservedSlot: null, yellowLog: [],
+    salary: 2.0, contractYears: 2,
+    rating: 6.0, FIN: 6.0, SHO: 6.0, PAS: 6.0, VIS: 6.0, DRI: 6.0,
+    PAC: 6.0, STA: 6.0, DEF: 6.0, TAC: 6.0, POS_attr: 6.0, COM: 6.0,
+    WR: 6.0, AGG: 6.0, STR: 6.0, AER: 6.0,
+  };
+  return { ...base, rating: computeOverall(base) };
+}
+
 // Exponential injury duration: 1 week is most common, escalating up to a rare
 // season-ending blow. Only applied to players carried off (emergency-subbed).
 export function rollInjuryWeeks(): number {
