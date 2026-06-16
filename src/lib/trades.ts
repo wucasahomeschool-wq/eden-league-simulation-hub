@@ -473,3 +473,87 @@ export function buildProposalFromTerms(
   };
 }
 
+// Validate a draft-time AI proposal that may include players, draft picks, and
+// cash on either side. Resolves pick labels to ids the sending club actually
+// owns. Returns a complete TradeProposal, or null if anything is illegal /
+// hallucinated. Player/cash legality reuses tradeBlockReason; picks are pure
+// ownership transfers (no roster/cap impact).
+export function buildAiPickProposal(
+  state: LeagueState,
+  teamA: string,
+  teamB: string,
+  aSends: string,
+  bSends: string,
+  aPickLabels: string[],
+  bPickLabels: string[],
+  cashAReceives: number,
+  cashBReceives: number,
+  idSuffix: string | number
+): TradeProposal | null {
+  const ta = state.teams[teamA];
+  const tb = state.teams[teamB];
+  if (!ta || !tb || teamA === teamB) return null;
+
+  // Players are optional in a draft deal, but any named player must exist.
+  const aPlayers = aSends ? [aSends] : [];
+  const bPlayers = bSends ? [bSends] : [];
+  if (aSends && !ta.players.some((p) => p.name === aSends)) return null;
+  if (bSends && !tb.players.some((p) => p.name === bSends)) return null;
+
+  // Resolve pick labels to ids the sending club currently owns.
+  const resolvePicks = (owner: string, labels: string[]): string[] | null => {
+    const ids: string[] = [];
+    for (const label of labels) {
+      const pk = (state.draftPicks ?? []).find(
+        (p) => p.owner === owner && pickLabel(p) === label
+      );
+      if (!pk) return null; // hallucinated or not owned
+      if (ids.includes(pk.id)) return null; // duplicate
+      ids.push(pk.id);
+    }
+    return ids;
+  };
+  const aPickIds = resolvePicks(teamA, aPickLabels);
+  const bPickIds = resolvePicks(teamB, bPickLabels);
+  if (aPickIds === null || bPickIds === null) return null;
+
+  const cashA = Math.max(0, round1(cashAReceives) || 0);
+  const cashB = Math.max(0, round1(cashBReceives) || 0);
+
+  // Must move at least one asset.
+  if (!aPlayers.length && !bPlayers.length && !aPickIds.length && !bPickIds.length && cashA === 0 && cashB === 0) {
+    return null;
+  }
+
+  // Player/cash legality (picks are exempt from roster/cap checks).
+  const reason = tradeBlockReason(state, teamA, teamB, aPlayers, bPlayers, cashA, cashB);
+  if (reason) return null;
+
+  // Utility delta only applies to player swaps; informational only here.
+  let deltaUA = 0;
+  let deltaUB = 0;
+  const pA = aSends ? ta.players.find((p) => p.name === aSends) : undefined;
+  const pB = bSends ? tb.players.find((p) => p.name === bSends) : undefined;
+  if (pA && pB) {
+    const squadA = buildSquad(ta);
+    const squadB = buildSquad(tb);
+    deltaUA = tradeUtilityDelta(squadA, pA, pB, cashA - cashB);
+    deltaUB = tradeUtilityDelta(squadB, pB, pA, cashB - cashA);
+  }
+
+  return {
+    id: `tp-draft-${state.season}-${idSuffix}`,
+    teamA,
+    teamB,
+    aSends,
+    bSends,
+    cashAReceives: cashA,
+    cashBReceives: cashB,
+    deltaUA: round2(deltaUA),
+    deltaUB: round2(deltaUB),
+    aPickIds,
+    bPickIds,
+  };
+}
+
+
