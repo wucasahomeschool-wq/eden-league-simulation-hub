@@ -3,6 +3,7 @@ import {
   useLeague, ATTR_KEYS, isPlayerOut, SEASON_ENDING_WEEKS,
   buildLineupSlots, isValidFormation, type AttrKey, type LineupSlot,
 } from "@/state/league";
+import { useNavigation } from "@/state/navigation";
 import { isContractExempt } from "@/lib/engine-settings";
 import { moraleLabel } from "@/lib/morale";
 import { Button } from "@/components/ui/button";
