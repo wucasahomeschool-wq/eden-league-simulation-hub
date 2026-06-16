@@ -44,9 +44,11 @@ const MODEL = "google/gemini-3-flash-preview";
 function describeTerms(t: NegotiationTerms): string {
   const userSends =
     (t.userSends.length ? t.userSends.join(", ") : "no players") +
+    (t.userPicks && t.userPicks.length ? ` + draft picks [${t.userPicks.join(", ")}]` : "") +
     (t.cashAiReceives > 0 ? ` + $${t.cashAiReceives}M cash` : "");
   const aiSends =
     (t.aiSends.length ? t.aiSends.join(", ") : "no players") +
+    (t.aiPicks && t.aiPicks.length ? ` + draft picks [${t.aiPicks.join(", ")}]` : "") +
     (t.cashUserReceives > 0 ? ` + $${t.cashUserReceives}M cash` : "");
   return [
     `CURRENT PROPOSED TERMS (the deal on the table right now):`,
