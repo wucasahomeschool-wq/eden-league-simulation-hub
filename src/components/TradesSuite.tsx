@@ -206,8 +206,9 @@ function ManualTrade({
   teams, onSubmit,
 }: {
   teams: LeagueTeam[];
-  onSubmit: (teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashA: number, cashB: number) => boolean;
+  onSubmit: (teamA: string, teamB: string, aPlayers: string[], bPlayers: string[], cashA: number, cashB: number, aPickIds: string[], bPickIds: string[]) => boolean;
 }) {
+  const { state } = useLeague();
   const [teamAName, setTeamAName] = useState(teams[0].name);
   const [teamBName, setTeamBName] = useState(teams[1].name);
   const teamA = teams.find((t) => t.name === teamAName) ?? teams[0];
@@ -217,6 +218,13 @@ function ManualTrade({
   const [bPlayers, setBPlayers] = useState<string[]>([]);
   const [cashAReceives, setCashAReceives] = useState("0");
   const [cashBReceives, setCashBReceives] = useState("0");
+  const [aPicks, setAPicks] = useState<string[]>([]);
+  const [bPicks, setBPicks] = useState<string[]>([]);
+
+  const aOwnedPicks = useMemo(() => state.draftPicks.filter((p) => p.owner === teamAName), [state.draftPicks, teamAName]);
+  const bOwnedPicks = useMemo(() => state.draftPicks.filter((p) => p.owner === teamBName), [state.draftPicks, teamBName]);
+  const validAPicks = useMemo(() => aPicks.filter((id) => aOwnedPicks.some((p) => p.id === id)), [aPicks, aOwnedPicks]);
+  const validBPicks = useMemo(() => bPicks.filter((id) => bOwnedPicks.some((p) => p.id === id)), [bPicks, bOwnedPicks]);
 
   // Reset selections when a club changes so stale names don't linger.
   const aRosterKey = useMemo(() => teamA.players.map((p) => p.name).join("|"), [teamA]);
@@ -227,7 +235,12 @@ function ManualTrade({
   const sameTeam = teamAName === teamBName;
   const aValueTotal = validA.reduce((s, n) => s + (calculatePlayerValue(teamA.players.find((p) => p.name === n)!) || 0), 0);
   const bValueTotal = validB.reduce((s, n) => s + (calculatePlayerValue(teamB.players.find((p) => p.name === n)!) || 0), 0);
-  const nothing = validA.length === 0 && validB.length === 0;
+  const nothing = validA.length === 0 && validB.length === 0 && validAPicks.length === 0 && validBPicks.length === 0;
+
+  function togglePick(side: "a" | "b", id: string) {
+    if (side === "a") setAPicks((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+    else setBPicks((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  }
 
   function submit() {
     if (sameTeam || nothing) return;
@@ -235,9 +248,10 @@ function ManualTrade({
       teamAName, teamBName, validA, validB,
       Math.max(0, parseFloat(cashAReceives) || 0),
       Math.max(0, parseFloat(cashBReceives) || 0),
+      validAPicks, validBPicks,
     );
     if (!ok) return; // keep the form intact so the deal can be adjusted
-    setAPlayers([]); setBPlayers([]); setCashAReceives("0"); setCashBReceives("0");
+    setAPlayers([]); setBPlayers([]); setCashAReceives("0"); setCashBReceives("0"); setAPicks([]); setBPicks([]);
   }
 
   return (
