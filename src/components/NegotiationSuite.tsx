@@ -85,11 +85,13 @@ export function NegotiationSuite() {
             proposalId: p.id, userTeam, aiTeam,
             userSends: [p.aSends], aiSends: [p.bSends],
             cashUserReceives: p.cashAReceives, cashAiReceives: p.cashBReceives,
+            userPicks: p.aPickIds ?? [], aiPicks: p.bPickIds ?? [],
           }
         : {
             proposalId: p.id, userTeam, aiTeam,
             userSends: [p.bSends], aiSends: [p.aSends],
             cashUserReceives: p.cashBReceives, cashAiReceives: p.cashAReceives,
+            userPicks: p.bPickIds ?? [], aiPicks: p.aPickIds ?? [],
           };
     setSession(seed);
   }
@@ -99,7 +101,7 @@ export function NegotiationSuite() {
       <NegotiationPanel
         key={`${session.userTeam}-${session.aiTeam}-${session.proposalId ?? "fresh"}`}
         seed={session}
-        onClose={() => setSession(null)}
+        onClose={closeSession}
       />
     );
   }
