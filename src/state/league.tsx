@@ -1043,7 +1043,9 @@ function moveTrade(
   aPlayers: string[],
   bPlayers: string[],
   cashAReceives: number,
-  cashBReceives: number
+  cashBReceives: number,
+  aPickIds: string[] = [],
+  bPickIds: string[] = []
 ): LeagueState {
   if (aName === bName) return prev;
   const teamA = prev.teams[aName];
@@ -1052,9 +1054,16 @@ function moveTrade(
 
   const aSet = new Set(aPlayers.filter(Boolean));
   const bSet = new Set(bPlayers.filter(Boolean));
+  const aPickSet = new Set(aPickIds.filter(Boolean));
+  const bPickSet = new Set(bPickIds.filter(Boolean));
   const movingFromA = teamA.players.filter((p) => aSet.has(p.name)).map((p) => ({ ...p, starter: false, reservedSlot: null }));
   const movingFromB = teamB.players.filter((p) => bSet.has(p.name)).map((p) => ({ ...p, starter: false, reservedSlot: null }));
-  if (!movingFromA.length && !movingFromB.length && cashAReceives === 0 && cashBReceives === 0) return prev;
+  const noAssets =
+    !movingFromA.length && !movingFromB.length && cashAReceives === 0 &&
+    cashBReceives === 0 && aPickSet.size === 0 && bPickSet.size === 0;
+  if (noAssets) return prev;
+
+
 
   const aBudgetBefore = parseBudget(teamA.budget);
   const bBudgetBefore = parseBudget(teamB.budget);
