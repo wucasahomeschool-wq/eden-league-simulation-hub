@@ -364,12 +364,28 @@ export function tradeBlockReason(
   aPlayers: string[],
   bPlayers: string[],
   cashAReceives: number, // $M paid by B to A
-  cashBReceives: number  // $M paid by A to B
+  cashBReceives: number,  // $M paid by A to B
+  aPickIds: string[] = [], // draft pick ids A sends to B
+  bPickIds: string[] = []  // draft pick ids B sends to A
 ): string | null {
   if (aName === bName) return "Pick two different clubs.";
   const teamA = state.teams[aName];
   const teamB = state.teams[bName];
   if (!teamA || !teamB) return "Unknown club selected.";
+
+  // ---- Draft-pick ownership: a club can only trade picks it currently owns ----
+  const picks = state.draftPicks ?? [];
+  for (const id of aPickIds) {
+    const pk = picks.find((p) => p.id === id);
+    if (!pk || pk.owner !== aName) return `${aName} no longer owns one of the selected draft picks.`;
+  }
+  for (const id of bPickIds) {
+    const pk = picks.find((p) => p.id === id);
+    if (!pk || pk.owner !== bName) return `${bName} no longer owns one of the selected draft picks.`;
+  }
+  for (const id of aPickIds) {
+    if (bPickIds.includes(id)) return "A draft pick can't be on both sides of the trade.";
+  }
 
   // ---- Affordability: a club cannot spend cash it doesn't have ----
   const aBudget = parseBudget(teamA.budget);
