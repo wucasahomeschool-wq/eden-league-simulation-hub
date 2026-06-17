@@ -34,6 +34,7 @@ export interface EngineSettings {
   sackThreshold: number;         // morale below this sacks the manager
   managerRenewalMorale: number;  // morale reset after a sacking
   seasonMoraleReset: number;     // points morale regresses toward baseline each season
+  moraleVolatility: number;      // multiplier on every morale swing (1.0 = engine default; lower = calmer)
 }
 
 export const DEFAULT_SETTINGS: EngineSettings = {
@@ -61,6 +62,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   sackThreshold: 25,
   managerRenewalMorale: 60,
   seasonMoraleReset: 7,
+  moraleVolatility: 1.0,
 };
 
 // Live, mutable singleton every engine reads from.

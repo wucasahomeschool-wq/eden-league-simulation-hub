@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useLeague, isManualOnly, isWeekComplete, type FixtureEntry,
 } from "@/state/league";
@@ -16,6 +16,7 @@ export function ScheduleSuite() {
   const [simFixture, setSimFixture] = useState<FixtureEntry | null>(null);
   const [manualFixture, setManualFixture] = useState<FixtureEntry | null>(null);
   const [commentaryFixture, setCommentaryFixture] = useState<FixtureEntry | null>(null);
+  const activeWeekRef = useRef<HTMLElement>(null);
 
   const weeks = useMemo(() => {
     const map = new Map<number, FixtureEntry[]>();
@@ -25,6 +26,17 @@ export function ScheduleSuite() {
     }
     return [...map.entries()].sort((a, b) => a[0] - b[0]);
   }, [state.fixtures]);
+
+  // On open, jump straight to the current week instead of starting at Week 1.
+  useEffect(() => {
+    const el = activeWeekRef.current;
+    if (el) {
+      el.scrollIntoView({ block: "center", behavior: "auto" });
+    }
+    // Run once after the schedule first paints for the active week.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.currentWeek, weeks.length]);
+
 
   const week12Done = isWeekComplete(state, 12);
   const finalFourExists = state.fixtures.some((f) => f.week >= 13);
@@ -65,7 +77,11 @@ export function ScheduleSuite() {
           const isFinalFour = week >= 13;
           const weekComplete = fixtures.length > 0 && fixtures.every((f) => state.results[f.id]);
           return (
-            <section key={week} className="rounded-xl border bg-card">
+            <section
+              key={week}
+              ref={isActive ? activeWeekRef : undefined}
+              className="rounded-xl border bg-card scroll-mt-28"
+            >
               <header className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
                 <h3 className="text-sm font-bold uppercase tracking-wide">
                   {isFinalFour ? `Final Four · Week ${week}` : `Week ${week}`}

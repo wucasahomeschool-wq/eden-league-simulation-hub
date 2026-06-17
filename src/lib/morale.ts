@@ -83,8 +83,11 @@ export function clampMorale(v: number): number {
 }
 
 // Apply a team macro event in place; returns whether a sacking was triggered.
+// The morale-volatility knob scales the size of every swing (1.0 = engine
+// default; a lower value makes morale calmer / more resistant to sackings).
 export function applyTeamEvent(team: LeagueTeam, event: TeamEvent): boolean {
-  team.morale = clampMorale((team.morale ?? settings.moraleBaseline) + TEAM_EVENTS[event]);
+  const swing = TEAM_EVENTS[event] * settings.moraleVolatility;
+  team.morale = clampMorale((team.morale ?? settings.moraleBaseline) + swing);
   if (team.morale < settings.sackThreshold) {
     triggerManagerSack(team);
     return true;
@@ -118,7 +121,8 @@ export function applyPlayerEvent(
   event: PlayerEvent
 ): void {
   if (isManualSimTeam(team.name)) return;
-  player.morale = clampMorale((player.morale ?? settings.moraleBaseline) + PLAYER_EVENTS[event]);
+  const swing = PLAYER_EVENTS[event] * settings.moraleVolatility;
+  player.morale = clampMorale((player.morale ?? settings.moraleBaseline) + swing);
 }
 
 // ---------------- Match simulation scaling ----------------

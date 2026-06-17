@@ -9,6 +9,49 @@ export function pickLabel(pick: DraftPick): string {
   return `S${pick.season} R${pick.round} (${pick.originalTeam})`;
 }
 
+// ---------------- Draft pick valuation ----------------
+// Prospect overalls span ~7.4 (the very best) down to ~3.0, with FAR more weak
+// prospects than strong ones (an exponential talent curve). The draft order is
+// reverse final standings, so a pick's real worth depends on WHERE it is likely
+// to land: a strong club's pick lands late (weak prospect left), a weak club's
+// pick lands early (access to the rare elite prospects).
+
+const PROSPECT_TOP_OVR = 7.4;
+const PROSPECT_BOTTOM_OVR = 3.0;
+
+// Expected overall of the prospect likely available at a given draft slot
+// (1-indexed). Convex/exponential decay: a gentle drop among the scarce elites
+// up top, then values fall away and bunch up low. slot 1 → ~7.4, last → ~3.0.
+export function expectedProspectOvr(slot: number, totalSlots: number): number {
+  if (totalSlots <= 1) return PROSPECT_TOP_OVR;
+  const k = 0.02; // decay constant tuned so the top ~5 picks sit ~7.4–6.8
+  const t = Math.max(1, Math.min(totalSlots, slot)) - 1;
+  const end = Math.exp(-k * (totalSlots - 1));
+  const norm = (Math.exp(-k * t) - end) / (1 - end); // 1 at slot 1, 0 at last slot
+  return Math.round((PROSPECT_BOTTOM_OVR + (PROSPECT_TOP_OVR - PROSPECT_BOTTOM_OVR) * norm) * 10) / 10;
+}
+
+// Estimate the overall draft slot a pick is likely to land at, based on the
+// ORIGINAL team's current standings rank (1 = top of the table). Reverse
+// standings: the worst-ranked club picks first. Round 2 sits a full round later.
+export function estimatePickSlot(pick: DraftPick, rank: number, totalTeams: number): number {
+  const r = Math.max(1, Math.min(totalTeams, rank));
+  const slotInRound = totalTeams - r + 1; // rank 1 (best) → last in round; worst → 1st
+  return (pick.round - 1) * totalTeams + slotInRound;
+}
+
+// One-line valuation digest for a pick, used in AI briefs.
+export function describePickValue(
+  pick: DraftPick,
+  rank: number,
+  totalTeams: number
+): string {
+  const totalSlots = totalTeams * 2;
+  const slot = estimatePickSlot(pick, rank, totalTeams);
+  const ovr = expectedProspectOvr(slot, totalSlots);
+  return `${pickLabel(pick)} — likely ~pick #${slot} of ${totalSlots} overall (originally ${pick.originalTeam}, currently ranked ${rank}); expected prospect OVR ~${ovr.toFixed(1)}`;
+}
+
 // ---------------- Budget parsing / formatting ----------------
 // Budgets are stored as display strings like "$21M" / "$24.6M". The algorithm
 // works in millions of dollars (numbers).
@@ -321,12 +364,28 @@ export function tradeBlockReason(
   aPlayers: string[],
   bPlayers: string[],
   cashAReceives: number, // $M paid by B to A
-  cashBReceives: number  // $M paid by A to B
+  cashBReceives: number,  // $M paid by A to B
+  aPickIds: string[] = [], // draft pick ids A sends to B
+  bPickIds: string[] = []  // draft pick ids B sends to A
 ): string | null {
   if (aName === bName) return "Pick two different clubs.";
   const teamA = state.teams[aName];
   const teamB = state.teams[bName];
   if (!teamA || !teamB) return "Unknown club selected.";
+
+  // ---- Draft-pick ownership: a club can only trade picks it currently owns ----
+  const picks = state.draftPicks ?? [];
+  for (const id of aPickIds) {
+    const pk = picks.find((p) => p.id === id);
+    if (!pk || pk.owner !== aName) return `${aName} no longer owns one of the selected draft picks.`;
+  }
+  for (const id of bPickIds) {
+    const pk = picks.find((p) => p.id === id);
+    if (!pk || pk.owner !== bName) return `${bName} no longer owns one of the selected draft picks.`;
+  }
+  for (const id of aPickIds) {
+    if (bPickIds.includes(id)) return "A draft pick can't be on both sides of the trade.";
+  }
 
   // ---- Affordability: a club cannot spend cash it doesn't have ----
   const aBudget = parseBudget(teamA.budget);
@@ -399,9 +458,18 @@ function aiRosterLines(team: LeagueTeam): string {
     .join("\n");
 }
 
-export function buildTradeMarketBrief(state: LeagueState, excludeTeams: string[] = []): string {
+export function buildTradeMarketBrief(
+  state: LeagueState,
+  excludeTeams: string[] = [],
+  rankOf?: (team: string) => number
+): string {
   const cap = state.salaryCap ?? 0;
   const exclude = new Set(excludeTeams);
+  const totalTeams = state.teamOrder.length;
+  const rank = (team: string) => {
+    const r = rankOf?.(team);
+    return r && r > 0 ? r : Math.ceil(totalTeams / 2); // unknown → mid-table
+  };
   const lines: string[] = [
     `SALARY CAP: $${cap}M hard cap (a club's total payroll cannot exceed this after a trade).`,
     `CURRENT SEASON ${state.season}, WEEK ${state.currentWeek}.`,
@@ -412,18 +480,19 @@ export function buildTradeMarketBrief(state: LeagueState, excludeTeams: string[]
     const t = state.teams[name];
     if (!t) continue;
     const payroll = Math.round(t.players.reduce((s, p) => s + (p.salary ?? 0), 0) * 10) / 10;
-    const ownedPicks = (state.draftPicks ?? [])
+    const ownedPickLines = (state.draftPicks ?? [])
       .filter((pk) => pk.owner === name)
-      .map(pickLabel);
+      .map((pk) => describePickValue(pk, rank(pk.originalTeam), totalTeams));
     lines.push(
       `${name} — style "${t.tactical_style}", transfer budget ${t.budget}, payroll $${payroll}M:`,
       aiRosterLines(t),
-      `    draft picks owned: ${ownedPicks.length ? ownedPicks.join(", ") : "none"}`,
+      `    draft picks owned:${ownedPickLines.length ? "\n      " + ownedPickLines.join("\n      ") : " none"}`,
       ``
     );
   }
   lines.push(
-    `Note: player "value" is the league's fair-market valuation in $M. A fair deal trades players of similar combined value, with cash bridging any gap. Draft picks are valuable assets, especially for clubs short on budget (every rookie signs a cheap $2M/2yr deal).`
+    `Note: player "value" is the league's fair-market valuation in $M. A fair deal trades players of similar combined value, with cash bridging any gap.`,
+    `DRAFT PICK VALUATION: Prospect overalls run from ~7.4 (the rare elites) down to ~3.0, with FAR more weak prospects than strong ones. The draft uses reverse standings, so judge a pick by its LIKELY slot, not just that it is a pick: an early pick (from a weak club) can land a 7.0+ talent and is genuinely valuable, while a late pick (from a strong club) will likely yield a sub-5.0 prospect and is worth little. A typical mid pick is worth roughly the value of a low-rated bench player. Picks are especially attractive to budget-strapped clubs because every rookie signs a cheap $2M/2yr deal. Weigh each pick's expected prospect OVR (shown above) against the players in the deal.`
   );
   return lines.join("\n");
 }

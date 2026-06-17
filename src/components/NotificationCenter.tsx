@@ -10,7 +10,8 @@ type NotifKind =
   | "leader"
   | "trades"
   | "week"
-  | "champion";
+  | "champion"
+  | "sack";
 
 interface Notif {
   id: string;
@@ -28,6 +29,7 @@ const KIND_META: Record<NotifKind, { icon: string; tone: string }> = {
   trades: { icon: "⇄", tone: "text-highlight-blue" },
   week: { icon: "›", tone: "text-muted-foreground" },
   champion: { icon: "🏆", tone: "text-stadium-gold" },
+  sack: { icon: "⚑", tone: "text-highlight-red" },
 };
 
 // Collect the set of players currently out, keyed "Team::Player".
@@ -62,8 +64,9 @@ export function NotificationCenter() {
     week: number;
     champion: string | null;
     out: Map<string, { team: string; player: string; injury: boolean }>;
+    sacked: Set<string>;
     init: boolean;
-  }>({ leader: null, proposals: 0, week: 0, champion: null, out: new Map(), init: false });
+  }>({ leader: null, proposals: 0, week: 0, champion: null, out: new Map(), sacked: new Set(), init: false });
 
   function push(items: Omit<Notif, "id" | "ts">[]) {
     if (items.length === 0) return;
@@ -80,10 +83,16 @@ export function NotificationCenter() {
     const week = state.currentWeek;
     const champion = state.playoffs?.champion ?? null;
     const out = outSet(state.teams, state.teamOrder);
+    // Clubs whose manager has just been sacked: flagged for AI regeneration or
+    // currently being held by a caretaker.
+    const sacked = new Set<string>();
+    for (const [team, m] of Object.entries(state.managers ?? {})) {
+      if (m.pendingGeneration || m.name === "Interim Manager") sacked.add(team);
+    }
     const p = prev.current;
 
     if (!p.init) {
-      prev.current = { leader, proposals, week, champion, out, init: true };
+      prev.current = { leader, proposals, week, champion, out, sacked, init: true };
       return;
     }
 
@@ -146,7 +155,18 @@ export function NotificationCenter() {
       });
     }
 
-    prev.current = { leader, proposals, week, champion, out, init: true };
+    // Manager sacked (newly entered the sacked/caretaker state).
+    for (const team of sacked) {
+      if (!p.sacked.has(team)) {
+        batch.push({
+          kind: "sack",
+          title: "Manager Sacked",
+          detail: `${team} have parted ways with their manager after a morale collapse. A replacement is being appointed.`,
+        });
+      }
+    }
+
+    prev.current = { leader, proposals, week, champion, out, sacked, init: true };
     push(batch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, standings]);

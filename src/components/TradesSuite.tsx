@@ -22,7 +22,7 @@ const TOP_COUNT = 5;
 const NONE = "__none__";
 
 export function TradesSuite() {
-  const { state, executeTrade, executeManualTrade, declineTrade, setTradeProposals } = useLeague();
+  const { state, standings, executeTrade, executeManualTrade, declineTrade, setTradeProposals } = useLeague();
   const runAiEngine = useServerFn(generateAiTradeProposals);
   const lastWindowWeek = state.settings?.transferWindowLastWeek ?? TRANSFER_WINDOW_LAST_WEEK;
   const inWindow = state.currentWeek <= lastWindowWeek;
@@ -33,7 +33,8 @@ export function TradesSuite() {
     if (aiLoading) return;
     setAiLoading(true);
     try {
-      const brief = buildTradeMarketBrief(state);
+      const rankOf = (team: string) => standings.find((s) => s.team === team)?.rank ?? 0;
+      const brief = buildTradeMarketBrief(state, [], rankOf);
       const { proposals } = await runAiEngine({ data: { brief, count: 14 } });
       // Re-validate every AI proposal against all safety guards before surfacing.
       const validated: TradeProposal[] = [];

@@ -45,12 +45,12 @@ const SUITES = [
   { name: "Team Editor", render: () => <TeamEditorSuite /> },
   { name: "Trades", render: () => <TradesSuite /> },
   { name: "Negotiation", render: () => <NegotiationSuite /> },
-  { name: "Draft", render: () => <DraftSuite /> },
   { name: "Simulation Terminal", render: () => <SimulationTerminal /> },
-  { name: "Playoffs", render: () => <PlayoffsSuite /> },
-  { name: "Contracts", render: () => <ContractsSuite /> },
-  { name: "Match Scheduling", render: () => <MatchSchedulingSuite /> },
   { name: "Newsroom", render: () => <NewsSuite /> },
+  { name: "Playoffs", render: () => <PlayoffsSuite /> },
+  { name: "Match Scheduling", render: () => <MatchSchedulingSuite /> },
+  { name: "Contracts", render: () => <ContractsSuite /> },
+  { name: "Draft", render: () => <DraftSuite /> },
   { name: "Settings & Version Archives", render: () => <SettingsSuite /> },
 ];
 
