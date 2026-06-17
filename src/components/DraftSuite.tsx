@@ -315,7 +315,8 @@ function DraftBoard() {
     if (scanning) return;
     setScanning(true);
     try {
-      const brief = buildTradeMarketBrief(state);
+      const rankOf = (team: string) => standings.find((s) => s.team === team)?.rank ?? 0;
+      const brief = buildTradeMarketBrief(state, [], rankOf);
       const { proposals: raw } = await runEngine({ data: { brief, count: 10, allowPicks: true } });
       const validated: TradeProposal[] = [];
       const seen = new Set<string>();

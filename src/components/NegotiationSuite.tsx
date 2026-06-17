@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { useLeague, type LeagueTeam } from "@/state/league";
+import { useLeague, type LeagueTeam, type DraftPick } from "@/state/league";
 import { useNavigation } from "@/state/navigation";
 import { tradeBlockReason, calculatePlayerValue, pickLabel, type TradeProposal } from "@/lib/trades";
 import { buildNegotiationBrief } from "@/lib/negotiation-brief";
@@ -33,7 +33,7 @@ interface SessionSeed {
 
 
 export function NegotiationSuite() {
-  const { state } = useLeague();
+  const { state, executeTrade, declineTrade } = useLeague();
   const { consumePayload, goToSuite } = useNavigation();
   const exemptList = state.settings?.contractExemptTeams ?? [];
   const isUser = (n: string) => exemptList.includes(n);
@@ -124,7 +124,21 @@ export function NegotiationSuite() {
         ) : (
           <div className="space-y-3">
             {negotiationProposals.map((p) => (
-              <ProposalRow key={p.id} state={state} p={p} isUser={isUser} onOpen={() => openFromProposal(p)} />
+              <ProposalRow
+                key={p.id}
+                state={state}
+                p={p}
+                isUser={isUser}
+                onOpen={() => openFromProposal(p)}
+                onAccept={() => {
+                  executeTrade(p);
+                  toast.success("Trade accepted", { description: `${p.teamA} ↔ ${p.teamB}` });
+                }}
+                onDecline={() => {
+                  declineTrade(p.id);
+                  toast("Proposal declined", { description: `${p.teamA} ↔ ${p.teamB}` });
+                }}
+              />
             ))}
           </div>
         )}
@@ -147,12 +161,14 @@ export function NegotiationSuite() {
 }
 
 function ProposalRow({
-  state, p, isUser, onOpen,
+  state, p, isUser, onOpen, onAccept, onDecline,
 }: {
   state: ReturnType<typeof useLeague>["state"];
   p: TradeProposal;
   isUser: (n: string) => boolean;
   onOpen: () => void;
+  onAccept: () => void;
+  onDecline: () => void;
 }) {
   const userTeam = isUser(p.teamA) ? p.teamA : p.teamB;
   const aiTeam = userTeam === p.teamA ? p.teamB : p.teamA;
@@ -172,13 +188,19 @@ function ProposalRow({
             {p.cashAReceives > 0 && <> + <span className="font-mono">${p.cashAReceives}M</span></>}</p>
         </div>
       </div>
-      <div className="mt-3 flex items-center justify-between gap-2">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-[11px] text-muted-foreground">
           {both
             ? "Both clubs are yours — open to complete directly."
             : <>Rival manager: <span className="font-semibold text-foreground">{manager?.name ?? aiTeam}</span></>}
         </p>
-        <Button size="sm" onClick={onOpen}>NEGOTIATE</Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={onDecline}>
+            DECLINE
+          </Button>
+          <Button size="sm" variant="outline" onClick={onOpen}>NEGOTIATE</Button>
+          <Button size="sm" onClick={onAccept} className="font-semibold">ACCEPT</Button>
+        </div>
       </div>
     </div>
   );
@@ -223,17 +245,22 @@ function FreshNegotiation({
   );
 }
 
-function termsSignature(s: { userSends: string[]; aiSends: string[]; cashUserReceives: number; cashAiReceives: number }) {
+function termsSignature(s: {
+  userSends: string[]; aiSends: string[]; cashUserReceives: number; cashAiReceives: number;
+  userPicks?: string[]; aiPicks?: string[];
+}) {
   return [
     [...s.userSends].sort().join(","),
     [...s.aiSends].sort().join(","),
     s.cashUserReceives,
     s.cashAiReceives,
+    [...(s.userPicks ?? [])].sort().join(","),
+    [...(s.aiPicks ?? [])].sort().join(","),
   ].join("|");
 }
 
 function NegotiationPanel({ seed, onClose }: { seed: SessionSeed; onClose: () => void }) {
-  const { state, executeManualTrade, declineTrade } = useLeague();
+  const { state, standings, executeManualTrade, declineTrade } = useLeague();
   const run = useServerFn(negotiateTrade);
 
   const userTeamObj = state.teams[seed.userTeam];
@@ -245,15 +272,19 @@ function NegotiationPanel({ seed, onClose }: { seed: SessionSeed; onClose: () =>
   const [cashUserReceives, setCashUserReceives] = useState(String(seed.cashUserReceives || 0));
   const [cashAiReceives, setCashAiReceives] = useState(String(seed.cashAiReceives || 0));
 
-  // Draft picks in this deal are fixed from the seed (set in the source suite).
-  const userPickIds = useMemo(() => seed.userPicks ?? [], [seed.userPicks]);
-  const aiPickIds = useMemo(() => seed.aiPicks ?? [], [seed.aiPicks]);
+  // Draft picks are now editable mid-negotiation (seeded from the source suite).
+  const [userPickIds, setUserPickIds] = useState<string[]>(seed.userPicks ?? []);
+  const [aiPickIds, setAiPickIds] = useState<string[]>(seed.aiPicks ?? []);
   const labelFor = (id: string) => {
     const pk = state.draftPicks.find((p) => p.id === id);
     return pk ? pickLabel(pk) : id;
   };
   const userPickLabels = userPickIds.map(labelFor);
   const aiPickLabels = aiPickIds.map(labelFor);
+
+  // Picks each club currently owns and could put on the table.
+  const userOwnedPicks = state.draftPicks.filter((p) => p.owner === seed.userTeam);
+  const aiOwnedPicks = state.draftPicks.filter((p) => p.owner === seed.aiTeam);
 
   const [messages, setMessages] = useState<NegotiationTurn[]>([]);
   const [input, setInput] = useState("");
@@ -288,7 +319,8 @@ function NegotiationPanel({ seed, onClose }: { seed: SessionSeed; onClose: () =>
     const msg = input.trim();
     if (!msg || loading) return;
     setError(null);
-    const brief = buildNegotiationBrief(state, seed.userTeam, seed.aiTeam);
+    const rankOf = (team: string) => standings.find((s) => s.team === team)?.rank ?? 0;
+    const brief = buildNegotiationBrief(state, seed.userTeam, seed.aiTeam, rankOf);
     if (!brief) { setError("Couldn't read club data for this negotiation."); return; }
 
     const history = messages;
@@ -347,13 +379,25 @@ function NegotiationPanel({ seed, onClose }: { seed: SessionSeed; onClose: () =>
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <Button size="sm" variant="outline" onClick={onClose}>← Back to desk</Button>
-        <div className="text-right">
-          <div className="text-sm font-extrabold">{seed.userTeam} <span className="text-muted-foreground">vs</span> {seed.aiTeam}</div>
-          <div className="text-[11px] text-muted-foreground">
-            Manager: <span className="font-semibold text-foreground">{manager?.name ?? seed.aiTeam}</span>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <div className="text-sm font-extrabold">{seed.userTeam} <span className="text-muted-foreground">vs</span> {seed.aiTeam}</div>
+            <div className="text-[11px] text-muted-foreground">
+              Manager: <span className="font-semibold text-foreground">{manager?.name ?? seed.aiTeam}</span>
+            </div>
           </div>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={onClose}
+            className="font-semibold"
+            title="Walk away from this negotiation without trading"
+          >
+            CANCEL
+          </Button>
         </div>
       </div>
+
 
       {!isUserPersonality && manager?.personality && (
         <div className="rounded-lg border-l-4 border-stadium-gold bg-card px-4 py-2 text-xs italic text-muted-foreground">
@@ -367,18 +411,14 @@ function NegotiationPanel({ seed, onClose }: { seed: SessionSeed; onClose: () =>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <CascadingPlayers label={`${seed.userTeam} (you) send`} team={userTeamObj} value={userSends} onChange={setUserSends} />
-            {userPickLabels.length > 0 && (
-              <p className="text-[11px] text-muted-foreground">Picks out: <span className="font-mono text-foreground">{userPickLabels.join(", ")}</span></p>
-            )}
+            <PickPicker label="Your draft picks" owned={userOwnedPicks} selected={userPickIds} onChange={setUserPickIds} />
             <p className="text-[11px] text-muted-foreground">Value out: <span className="font-mono">${userValue.toFixed(1)}M</span></p>
             <label className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">You pay ($M)</label>
             <Input type="number" min={0} step="0.1" value={cashAiReceives} onChange={(e) => setCashAiReceives(e.target.value)} className="bg-card" />
           </div>
           <div className="space-y-2">
             <CascadingPlayers label={`${seed.aiTeam} send`} team={aiTeamObj} value={aiSends} onChange={setAiSends} />
-            {aiPickLabels.length > 0 && (
-              <p className="text-[11px] text-muted-foreground">Picks out: <span className="font-mono text-foreground">{aiPickLabels.join(", ")}</span></p>
-            )}
+            <PickPicker label={`${seed.aiTeam} draft picks`} owned={aiOwnedPicks} selected={aiPickIds} onChange={setAiPickIds} />
             <p className="text-[11px] text-muted-foreground">Value out: <span className="font-mono">${aiValue.toFixed(1)}M</span></p>
             <label className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">They pay you ($M)</label>
             <Input type="number" min={0} step="0.1" value={cashUserReceives} onChange={(e) => setCashUserReceives(e.target.value)} className="bg-card" />
@@ -438,6 +478,44 @@ function NegotiationPanel({ seed, onClose }: { seed: SessionSeed; onClose: () =>
     </div>
   );
 }
+
+// Toggle chips for the draft picks a club owns and may add to the deal.
+function PickPicker({
+  label, owned, selected, onChange,
+}: {
+  label: string; owned: DraftPick[]; selected: string[]; onChange: (ids: string[]) => void;
+}) {
+  if (owned.length === 0) return null;
+  function toggle(id: string) {
+    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  }
+  return (
+    <div>
+      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</label>
+      <div className="flex flex-wrap gap-1.5">
+        {owned.map((pk) => {
+          const on = selected.includes(pk.id);
+          return (
+            <button
+              key={pk.id}
+              type="button"
+              onClick={() => toggle(pk.id)}
+              className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                on
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background text-muted-foreground hover:border-primary/50"
+              }`}
+            >
+              {pickLabel(pk)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
 
 // Compact cascading player picker (mirrors the Trades Suite pattern).
 function CascadingPlayers({

@@ -7,6 +7,7 @@ import { SaveVersionButton } from "@/components/SaveVersionButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -15,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 
 export function SettingsSuite() {
-  const { state, setSalaryCap, setSettings, revertToVersion } = useLeague();
+  const { state, setSalaryCap, setSettings, revertToVersion, resetMorale } = useLeague();
   const s: EngineSettings = state.settings ?? DEFAULT_SETTINGS;
 
   return (
@@ -26,6 +27,7 @@ export function SettingsSuite() {
         teamOrder={state.teamOrder}
         setSalaryCap={setSalaryCap}
         setSettings={setSettings}
+        resetMorale={resetMorale}
       />
       <VersionArchive revertToVersion={revertToVersion} />
     </div>
@@ -34,15 +36,17 @@ export function SettingsSuite() {
 
 // ---------------- League Settings (all editable) ----------------
 function LeagueSettings({
-  s, cap, teamOrder, setSalaryCap, setSettings,
+  s, cap, teamOrder, setSalaryCap, setSettings, resetMorale,
 }: {
   s: EngineSettings;
   cap: number;
   teamOrder: string[];
   setSalaryCap: (n: number) => void;
   setSettings: (patch: Partial<EngineSettings>) => void;
+  resetMorale: () => void;
 }) {
   const [capDraft, setCapDraft] = useState("");
+  const [confirmResetMorale, setConfirmResetMorale] = useState(false);
 
   function commitCap() {
     const v = parseFloat(capDraft);
@@ -182,7 +186,65 @@ function LeagueSettings({
             label="Season carry-over reset" value={s.seasonMoraleReset} step={1} min={0} max={50}
             onCommit={(v) => setSettings({ seasonMoraleReset: Math.round(v) })}
           />
+
+          <div className="py-2">
+            <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+              <span className="text-muted-foreground">Morale volatility</span>
+              <span className="font-mono font-bold text-primary">{s.moraleVolatility.toFixed(2)}×</span>
+            </div>
+            <Slider
+              value={[s.moraleVolatility]}
+              min={0}
+              max={2}
+              step={0.05}
+              onValueChange={([v]) => setSettings({ moraleVolatility: Math.round(v * 100) / 100 })}
+            />
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+              Scales the size of every morale swing. <span className="font-semibold text-foreground">1.00×</span> is
+              the engine default. Lower it (e.g. 0.40×) to make squads far calmer so a beloved manager isn't
+              sacked over a short rough patch. Higher makes morale wilder.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 py-2">
+            <p className="text-[11px] text-muted-foreground">
+              Instantly restore <span className="font-semibold text-foreground">every</span> club &amp; player to the
+              baseline.
+            </p>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => setConfirmResetMorale(true)}
+              className="font-semibold"
+            >
+              ⚠ RESET MORALE
+            </Button>
+          </div>
         </SettingsCard>
+
+        <Dialog open={confirmResetMorale} onOpenChange={setConfirmResetMorale}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>⚠ Reset all morale to {s.moraleBaseline}?</DialogTitle>
+              <DialogDescription>
+                This sets <span className="font-semibold text-foreground">every team's morale</span> and{" "}
+                <span className="font-semibold text-foreground">every player's morale</span> across the entire
+                league back to the baseline ({s.moraleBaseline}). It does not undo any sackings that already
+                happened. This is a big, league-wide change — you can reverse it with the UNDO button afterwards.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setConfirmResetMorale(false)}>Cancel</Button>
+              <Button
+                variant="destructive"
+                onClick={() => { resetMorale(); setConfirmResetMorale(false); }}
+              >
+                Yes, reset all morale
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
 
         <SettingsCard title="League Structure (reference)">
           <Row label="Teams" value="24 · 9v9" />

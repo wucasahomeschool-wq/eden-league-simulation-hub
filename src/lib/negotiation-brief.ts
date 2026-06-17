@@ -3,7 +3,7 @@
 // computed trade values, budgets, salary cap) — no fabricated numbers. The AI
 // manager narrates only these facts.
 import type { LeagueState, LeagueTeam } from "@/state/league";
-import { calculatePlayerValue, parseBudget } from "@/lib/trades";
+import { calculatePlayerValue, parseBudget, describePickValue } from "@/lib/trades";
 
 function rosterLines(team: LeagueTeam): string {
   return team.players
@@ -24,13 +24,24 @@ function payrollOf(team: LeagueTeam): number {
 export function buildNegotiationBrief(
   state: LeagueState,
   userTeamName: string,
-  aiTeamName: string
+  aiTeamName: string,
+  rankOf?: (team: string) => number
 ): string | null {
   const userTeam = state.teams[userTeamName];
   const aiTeam = state.teams[aiTeamName];
   if (!userTeam || !aiTeam) return null;
 
   const cap = state.salaryCap ?? 0;
+  const totalTeams = state.teamOrder.length;
+  const rank = (team: string) => {
+    const r = rankOf?.(team);
+    return r && r > 0 ? r : Math.ceil(totalTeams / 2);
+  };
+  const ownedPickLines = (team: string): string => {
+    const picks = (state.draftPicks ?? []).filter((pk) => pk.owner === team);
+    if (!picks.length) return "none";
+    return "\n" + picks.map((pk) => `    - ${describePickValue(pk, rank(pk.originalTeam), totalTeams)}`).join("\n");
+  };
 
   const userMgrRaw = state.managers?.[userTeamName]?.name?.trim();
   const userMgr =
@@ -46,13 +57,16 @@ export function buildNegotiationBrief(
     `  Transfer budget: ${userTeam.budget}. Current payroll: $${payrollOf(userTeam)}M.`,
     `  Roster:`,
     rosterLines(userTeam),
+    `  Draft picks owned: ${ownedPickLines(userTeamName)}`,
     ``,
     `${aiTeamName} (YOUR club) — tactical style "${aiTeam.tactical_style}":`,
     `  Transfer budget: ${aiTeam.budget}. Current payroll: $${payrollOf(aiTeam)}M.`,
     `  Roster:`,
     rosterLines(aiTeam),
+    `  Draft picks owned: ${ownedPickLines(aiTeamName)}`,
     ``,
     `Note: player "value" is the league's fair-market valuation in $M. Use it to judge whether a deal is fair, a steal, or an overpay.`,
+    `DRAFT PICK VALUATION: Prospect overalls run ~7.4 (rare elites) down to ~3.0, with far more weak prospects than strong ones. The draft is reverse-standings, so judge each pick by its LIKELY slot (shown above): an early pick from a weak club can land a 7.0+ talent and is genuinely valuable; a late pick from a strong club likely yields a sub-5.0 prospect and is worth little. Picks are especially attractive to budget-strapped clubs (rookies sign cheap $2M/2yr deals). Weigh a pick's expected prospect OVR against the players involved — never treat all picks as equally valuable.`,
   ].join("\n");
 }
 

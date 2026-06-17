@@ -961,6 +961,7 @@ interface LeagueContextValue {
   selectProspect: (pickId: string, prospectName: string) => void;
   advanceDraftPick: () => void;
   resetDraft: () => void;
+  resetMorale: () => void;
   resetLeague: () => void;
   standings: StandingRow[];
   leaderboards: Leaderboards;
@@ -1892,6 +1893,20 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       }),
     resetDraft: () =>
       update((prev) => ({ ...prev, draft: undefined })),
+    resetMorale: () =>
+      update((prev) => {
+        const baseline = (prev.settings ?? getSettings()).moraleBaseline ?? 50;
+        const teams: Record<string, LeagueTeam> = {};
+        for (const name of prev.teamOrder) {
+          const t = prev.teams[name];
+          teams[name] = {
+            ...t,
+            morale: baseline,
+            players: t.players.map((p) => ({ ...p, morale: baseline })),
+          };
+        }
+        return { ...prev, teams };
+      }),
     resetLeague: () => update(() => initState()), // routed through update() so a full reset is undoable
   };
 
