@@ -174,17 +174,26 @@ function ProposalRow({
   const aiTeam = userTeam === p.teamA ? p.teamB : p.teamA;
   const manager = state.managers?.[aiTeam];
   const both = isUser(p.teamA) && isUser(p.teamB);
+  const labelPicks = (ids?: string[]) =>
+    (ids ?? []).map((id) => {
+      const pk = state.draftPicks.find((x) => x.id === id);
+      return pk ? pickLabel(pk) : null;
+    }).filter(Boolean) as string[];
+  const aPickLabels = labelPicks(p.aPickIds);
+  const bPickLabels = labelPicks(p.bPickIds);
+  const sideText = (player: string, picks: string[]) =>
+    [player?.trim() || null, ...picks].filter(Boolean).join(" + ") || "—";
   return (
     <div className="rounded-xl border bg-card p-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-lg border border-highlight-blue/40 bg-highlight-blue/5 p-3">
           <div className="text-xs font-bold uppercase tracking-wide text-highlight-blue">{p.teamA}</div>
-          <p className="mt-1 text-sm">Sends <span className="font-semibold">{p.aSends}</span>
+          <p className="mt-1 text-sm">Sends <span className="font-semibold">{sideText(p.aSends, aPickLabels)}</span>
             {p.cashBReceives > 0 && <> + <span className="font-mono">${p.cashBReceives}M</span></>}</p>
         </div>
         <div className="rounded-lg border border-highlight-red/40 bg-highlight-red/5 p-3">
           <div className="text-xs font-bold uppercase tracking-wide text-highlight-red">{p.teamB}</div>
-          <p className="mt-1 text-sm">Sends <span className="font-semibold">{p.bSends}</span>
+          <p className="mt-1 text-sm">Sends <span className="font-semibold">{sideText(p.bSends, bPickLabels)}</span>
             {p.cashAReceives > 0 && <> + <span className="font-mono">${p.cashAReceives}M</span></>}</p>
         </div>
       </div>
