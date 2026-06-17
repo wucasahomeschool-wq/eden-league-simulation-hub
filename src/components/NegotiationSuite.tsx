@@ -355,7 +355,7 @@ function NegotiationPanel({ seed, onClose }: { seed: SessionSeed; onClose: () =>
   function initiate() {
     const reason = tradeBlockReason(
       state, seed.userTeam, seed.aiTeam, userSends, aiSends,
-      terms.cashUserReceives, terms.cashAiReceives
+      terms.cashUserReceives, terms.cashAiReceives, userPickIds, aiPickIds
     );
     if (reason) { toast.error("Trade blocked", { description: reason }); return; }
     executeManualTrade(seed.userTeam, seed.aiTeam, userSends, aiSends, terms.cashUserReceives, terms.cashAiReceives, userPickIds, aiPickIds);
