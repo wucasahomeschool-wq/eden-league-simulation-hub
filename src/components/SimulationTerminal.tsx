@@ -34,8 +34,10 @@ export function SimulationTerminal({
   onExit,
   playoff = false,
 }: Props) {
-  const { state, addYouthPlayer } = useLeague();
+  const { state, addYouthPlayer, setSettings } = useLeague();
   const teams = state.teamOrder;
+  const blowoutThreshold = state.settings?.blowoutThreshold ?? settings.blowoutThreshold;
+  const blowoutDecay = state.settings?.blowoutDecay ?? settings.blowoutDecay;
 
   const [home, setHome] = useState(initialHome ?? teams[0]);
   const [away, setAway] = useState(initialAway ?? teams[1]);
