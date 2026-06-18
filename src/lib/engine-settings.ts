@@ -48,6 +48,9 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   dynamicTactics: true,
   weatherEffects: true,
   playoffPenalties: true,
+  blowoutThreshold: 3,
+  blowoutDecay: 0.05,
+  parityMultiplier: 1.0,
 
   demandModifierMin: 0.8,
   demandModifierMax: 1.4,
