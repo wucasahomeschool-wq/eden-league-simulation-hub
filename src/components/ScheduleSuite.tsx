@@ -31,7 +31,7 @@ export function ScheduleSuite() {
   useEffect(() => {
     const el = activeWeekRef.current;
     if (el) {
-      el.scrollIntoView({ block: "center", behavior: "auto" });
+      el.scrollIntoView({ block: "start", behavior: "auto" });
     }
     // Run once after the schedule first paints for the active week.
     // eslint-disable-next-line react-hooks/exhaustive-deps
