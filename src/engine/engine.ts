@@ -611,7 +611,7 @@ function execute_foul_set_piece(
   const gk_player = defending_team.active_roster.find((p) => p.position === "GK") || null;
   const gks_val = gk_player ? gk_player.rating : 5.0;
 
-  const soft_cap_modifier = score_margin >= 5 ? 1.0 / (1.0 + (score_margin - 4) * 0.25) : 1.0;
+  const soft_cap_modifier = blowout_modifier(score_margin);
 
   if (D <= 16) {
     log.push(`[${f1(new_TUP)}'] PENALTY KICK! Foul inside the box by ${defending_team.name}!`);
@@ -792,7 +792,7 @@ function execute_attack_phase(
     GOAL_MULTIPLIER;
 
   SP *= attacking_team.momentum;
-  if (score_margin >= 5) SP *= 1.0 / (1.0 + (score_margin - 4) * 0.25);
+  SP *= blowout_modifier(score_margin);
   SP = Math.max(0.01, Math.min(SP, 0.95));
 
   attacking_team.shots += 1;
@@ -892,7 +892,7 @@ function execute_corner_kick(
       Math.max(1.0, (gk_player ? gk_player.rating : 5.0) * 3.5)) *
     GOAL_MULTIPLIER;
   Header_SP *= attacking_team.momentum;
-  if (score_margin >= 5) Header_SP *= 1.0 / (1.0 + (score_margin - 4) * 0.25);
+  Header_SP *= blowout_modifier(score_margin);
   Header_SP = Math.max(0.01, Math.min(Header_SP, 0.85));
 
   attacking_team.shots += 1;
