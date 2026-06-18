@@ -105,6 +105,49 @@ function LeagueSettings({
             label="Playoff penalties (draw → shootout)" checked={s.playoffPenalties}
             onChange={(v) => setSettings({ playoffPenalties: v })}
           />
+
+          <div className="py-2">
+            <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+              <span className="text-muted-foreground">Parity multiplier (skill-gap)</span>
+              <span className="font-mono font-bold text-primary">{s.parityMultiplier.toFixed(2)}×</span>
+            </div>
+            <Slider
+              value={[s.parityMultiplier]}
+              min={0.5}
+              max={2}
+              step={0.05}
+              onValueChange={([v]) => setSettings({ parityMultiplier: Math.round(v * 100) / 100 })}
+            />
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+              Controls how much raw player attributes matter. <span className="font-semibold text-foreground">1.00×</span> is
+              normal. Lower (e.g. 0.50×) shrinks the gap between good and bad teams for tight, upset-prone games; higher
+              (1.50–2.00×) exaggerates it so favourites demolish weaker sides.
+            </p>
+          </div>
+
+          <NumberSetting
+            label="Blowout dampener — trigger margin (goals)" value={s.blowoutThreshold} step={1} min={1} max={10}
+            onCommit={(v) => setSettings({ blowoutThreshold: Math.round(v) })}
+          />
+          <div className="py-2">
+            <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+              <span className="text-muted-foreground">Blowout dampener — decay rate</span>
+              <span className="font-mono font-bold text-primary">{(s.blowoutDecay * 100).toFixed(0)}%</span>
+            </div>
+            <Slider
+              value={[s.blowoutDecay]}
+              min={0}
+              max={0.3}
+              step={0.01}
+              onValueChange={([v]) => setSettings({ blowoutDecay: Math.round(v * 100) / 100 })}
+            />
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+              Once a side leads by the trigger margin ({s.blowoutThreshold}+ goals), shooting probability is scaled down
+              for every goal deeper into blowout territory. <span className="font-semibold text-foreground">0%</span> disables
+              it; higher values cap runaway scorelines harder. Close games (e.g. 4-3) are never touched.
+            </p>
+          </div>
+
           <ExemptSetting
             label="Manual-only clubs (games entered by hand, never simulated)"
             teamOrder={teamOrder} selected={s.manualSimTeams}
