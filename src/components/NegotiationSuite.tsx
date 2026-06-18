@@ -141,6 +141,11 @@ export function NegotiationSuite() {
                 isUser={isUser}
                 onOpen={() => openFromProposal(p)}
                 onAccept={() => {
+                  const reason = tradeBlockReason(
+                    state, p.teamA, p.teamB, [p.aSends], [p.bSends],
+                    p.cashAReceives, p.cashBReceives, p.aPickIds ?? [], p.bPickIds ?? [],
+                  );
+                  if (reason) { toast.error("Trade blocked", { description: reason }); return; }
                   executeTrade(p);
                   toast.success("Trade accepted", { description: `${p.teamA} ↔ ${p.teamB}` });
                 }}
