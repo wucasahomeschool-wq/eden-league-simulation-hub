@@ -34,8 +34,10 @@ export function SimulationTerminal({
   onExit,
   playoff = false,
 }: Props) {
-  const { state, addYouthPlayer } = useLeague();
+  const { state, addYouthPlayer, setSettings } = useLeague();
   const teams = state.teamOrder;
+  const blowoutThreshold = state.settings?.blowoutThreshold ?? settings.blowoutThreshold;
+  const blowoutDecay = state.settings?.blowoutDecay ?? settings.blowoutDecay;
 
   const [home, setHome] = useState(initialHome ?? teams[0]);
   const [away, setAway] = useState(initialAway ?? teams[1]);
@@ -161,7 +163,19 @@ export function SimulationTerminal({
             <span>0.1 Defensive</span><span>2.0 Offensive</span>
           </div>
         </div>
+        <div className="rounded-lg border bg-card p-4">
+          <div className="mb-3 flex items-center justify-between text-sm font-semibold">
+            <span>Blowout Dampener ({blowoutThreshold}+ goal lead)</span>
+            <span className="text-primary">{(blowoutDecay * 100).toFixed(0)}%</span>
+          </div>
+          <Slider min={0} max={0.3} step={0.01} value={[blowoutDecay]}
+            onValueChange={(v) => setSettings({ blowoutDecay: Math.round(v[0] * 100) / 100 })} />
+          <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+            <span>0% Off</span><span>30% Hard cap</span>
+          </div>
+        </div>
       </div>
+
 
       {/* Scoreboard */}
       <div className="mt-6 rounded-xl border bg-panel p-5">

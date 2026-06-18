@@ -14,6 +14,9 @@ export interface EngineSettings {
   dynamicTactics: boolean;       // live in-match tactical shifts
   weatherEffects: boolean;       // randomized weather modifiers
   playoffPenalties: boolean;     // drawn playoff ties go to a shootout
+  blowoutThreshold: number;      // goal margin at which the blowout dampener activates (>= this many goals)
+  blowoutDecay: number;          // per-goal-deep shooting-probability decay once a match is in blowout territory
+  parityMultiplier: number;      // scales how much raw player attributes matter (1.0 = normal, <1 = closer games, >1 = wider gaps)
 
   // ---- Contract engine ----
   demandModifierMin: number;     // lower clamp on player wage demand modifier
@@ -45,6 +48,9 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   dynamicTactics: true,
   weatherEffects: true,
   playoffPenalties: true,
+  blowoutThreshold: 3,
+  blowoutDecay: 0.05,
+  parityMultiplier: 1.0,
 
   demandModifierMin: 0.8,
   demandModifierMax: 1.4,

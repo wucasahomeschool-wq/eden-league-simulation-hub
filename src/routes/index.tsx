@@ -19,7 +19,7 @@ import { ManagerGenerationWatcher } from "@/components/ManagerGenerationWatcher"
 import { NavigationProvider, useNavigation } from "@/state/navigation";
 import { downloadLeagueExport } from "@/lib/league-export";
 import { Button } from "@/components/ui/button";
-import edenLogo from "@/assets/eden-league-logo.png.asset.json";
+import edenLogo from "@/assets/eden-league-logo.svg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -75,7 +75,7 @@ function Hub() {
             </button>
             <div className="flex flex-col items-center text-center">
               <div className="flex items-center gap-2">
-                <img src={edenLogo.url} alt="Eden League crest" className="h-8 w-8 object-contain" />
+                <img src={edenLogo} alt="Eden League crest" className="h-8 w-8 object-contain" />
                 <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                   Eden League Data Hub
                 </div>

@@ -60,10 +60,20 @@ export function NegotiationSuite() {
   }
 
 
-  // Proposals that involve at least one user-controlled club.
+  // Proposals that involve at least one user-controlled club. Only surface deals
+  // that are still legal RIGHT NOW (budgets/cap/roster can shift after other
+  // trades), so the desk never shows a deal you can't actually accept.
   const negotiationProposals = useMemo(
-    () => state.tradeProposals.filter((p) => isUser(p.teamA) || isUser(p.teamB)),
-    [state.tradeProposals, exemptList.join("|")]
+    () =>
+      state.tradeProposals.filter(
+        (p) =>
+          (isUser(p.teamA) || isUser(p.teamB)) &&
+          !tradeBlockReason(
+            state, p.teamA, p.teamB, [p.aSends], [p.bSends],
+            p.cashAReceives, p.cashBReceives, p.aPickIds ?? [], p.bPickIds ?? [],
+          ),
+      ),
+    [state, exemptList.join("|")]
   );
 
   if (userTeams.length === 0) {
@@ -131,6 +141,11 @@ export function NegotiationSuite() {
                 isUser={isUser}
                 onOpen={() => openFromProposal(p)}
                 onAccept={() => {
+                  const reason = tradeBlockReason(
+                    state, p.teamA, p.teamB, [p.aSends], [p.bSends],
+                    p.cashAReceives, p.cashBReceives, p.aPickIds ?? [], p.bPickIds ?? [],
+                  );
+                  if (reason) { toast.error("Trade blocked", { description: reason }); return; }
                   executeTrade(p);
                   toast.success("Trade accepted", { description: `${p.teamA} ↔ ${p.teamB}` });
                 }}

@@ -71,8 +71,19 @@ export function TradesSuite() {
   // Negotiation Suite. The automatic desk here shows pure AI-vs-AI deals only.
   const exemptList = state.settings?.contractExemptTeams ?? [];
   const autoProposals = useMemo(
-    () => state.tradeProposals.filter((t) => !exemptList.includes(t.teamA) && !exemptList.includes(t.teamB)),
-    [state.tradeProposals, exemptList.join("|")]
+    () =>
+      state.tradeProposals.filter(
+        (t) =>
+          !exemptList.includes(t.teamA) &&
+          !exemptList.includes(t.teamB) &&
+          // Only show deals that are still legal now — never surface a proposal
+          // whose ACCEPT button would be blocked by the cap/budget/roster guards.
+          !tradeBlockReason(
+            state, t.teamA, t.teamB, [t.aSends], [t.bSends],
+            t.cashAReceives, t.cashBReceives, t.aPickIds ?? [], t.bPickIds ?? [],
+          ),
+      ),
+    [state, exemptList.join("|")]
   );
 
 

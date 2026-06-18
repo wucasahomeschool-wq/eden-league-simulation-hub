@@ -14,6 +14,37 @@ import { settings } from "@/lib/engine-settings";
 export const GOAL_MULTIPLIER_DEFAULT = 0.6;
 export const IDENTITY_BOOST_WEIGHT = 0.6;
 
+// ---------------------------------------------------------------------------
+// EDITABLE TUNING HOOKS (these read live Settings knobs — they do not alter the
+// ported RNG/event ordering; they only scale inputs/probabilities).
+// ---------------------------------------------------------------------------
+
+// Blowout dampener: once the leading side is `blowoutThreshold` goals up, every
+// shooting probability is scaled down based on how many goals deep into blowout
+// territory the match is. Replaces the old hardcoded `score_margin >= 5` logic.
+function blowout_modifier(score_margin: number): number {
+  const threshold = settings.blowoutThreshold;
+  const decay = settings.blowoutDecay;
+  if (!Number.isFinite(decay) || decay <= 0) return 1.0;
+  if (!Number.isFinite(threshold) || score_margin < threshold) return 1.0;
+  const depth = score_margin - threshold + 1; // goals deep into blowout territory
+  return 1.0 / (1.0 + depth * decay);
+}
+
+// Parity multiplier: scales how far each player's attributes sit from the 5.0
+// midpoint. 1.0 = untouched; <1.0 compresses skill gaps (closer games / upsets);
+// >1.0 exaggerates them (favourites dominate). Applied once at team build, so the
+// match math and RNG sequence are completely unchanged.
+const PARITY_ATTRS = [
+  "FIN", "SHO", "PAS", "VIS", "DRI", "PAC", "STA", "DEF", "TAC",
+  "POS_attr", "COM", "WR", "AGG", "STR", "AER",
+] as const;
+function parity_scale(v: number): number {
+  const p = settings.parityMultiplier;
+  if (!Number.isFinite(p) || p === 1.0) return v;
+  return Math.max(1.0, Math.min(10.0, 5.0 + (v - 5.0) * p));
+}
+
 // ---- RNG helpers mirroring Python's `random` module semantics ----
 function uniform(a: number, b: number): number {
   return a + Math.random() * (b - a);
@@ -109,19 +140,29 @@ export function buildEngineTeam(
     | "injured_severe" | "saves" | "goals_conceded" | "clean_sheets"
   >[]
 ): EngineTeam {
-  const players: EnginePlayer[] = roster.map((r) => ({
-    ...r,
-    fatigue: 0.0,
-    goals: 0,
-    assists: 0,
-    fouls: 0,
-    yellow_cards: 0,
-    red_card: false,
-    injured_severe: false,
-    saves: 0,
-    goals_conceded: 0,
-    clean_sheets: 0,
-  }));
+  const players: EnginePlayer[] = roster.map((r) => {
+    // Apply the live Parity Multiplier to every raw attribute (and the overall
+    // rating) before the match math touches them. parity_scale is a no-op at 1.0.
+    const scaled: typeof r = { ...r, rating: parity_scale(r.rating) };
+    for (const k of PARITY_ATTRS) {
+      (scaled as unknown as Record<string, number>)[k] = parity_scale(
+        (r as unknown as Record<string, number>)[k]
+      );
+    }
+    return {
+      ...scaled,
+      fatigue: 0.0,
+      goals: 0,
+      assists: 0,
+      fouls: 0,
+      yellow_cards: 0,
+      red_card: false,
+      injured_severe: false,
+      saves: 0,
+      goals_conceded: 0,
+      clean_sheets: 0,
+    };
+  });
   return {
     name,
     tactical_style,
@@ -570,7 +611,7 @@ function execute_foul_set_piece(
   const gk_player = defending_team.active_roster.find((p) => p.position === "GK") || null;
   const gks_val = gk_player ? gk_player.rating : 5.0;
 
-  const soft_cap_modifier = score_margin >= 5 ? 1.0 / (1.0 + (score_margin - 4) * 0.25) : 1.0;
+  const soft_cap_modifier = blowout_modifier(score_margin);
 
   if (D <= 16) {
     log.push(`[${f1(new_TUP)}'] PENALTY KICK! Foul inside the box by ${defending_team.name}!`);
@@ -751,7 +792,7 @@ function execute_attack_phase(
     GOAL_MULTIPLIER;
 
   SP *= attacking_team.momentum;
-  if (score_margin >= 5) SP *= 1.0 / (1.0 + (score_margin - 4) * 0.25);
+  SP *= blowout_modifier(score_margin);
   SP = Math.max(0.01, Math.min(SP, 0.95));
 
   attacking_team.shots += 1;
@@ -851,7 +892,7 @@ function execute_corner_kick(
       Math.max(1.0, (gk_player ? gk_player.rating : 5.0) * 3.5)) *
     GOAL_MULTIPLIER;
   Header_SP *= attacking_team.momentum;
-  if (score_margin >= 5) Header_SP *= 1.0 / (1.0 + (score_margin - 4) * 0.25);
+  Header_SP *= blowout_modifier(score_margin);
   Header_SP = Math.max(0.01, Math.min(Header_SP, 0.85));
 
   attacking_team.shots += 1;
