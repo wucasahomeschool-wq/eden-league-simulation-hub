@@ -249,7 +249,7 @@ export function FixtureBuilder({
       <Dialog open={!!warnReport} onOpenChange={(o) => { if (!o) setWarnReport(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-highlight-gold">⚠ Possible rematch detected</DialogTitle>
+            <DialogTitle className="text-accent-foreground">⚠ Possible rematch detected</DialogTitle>
             <DialogDescription>
               The schedule is valid and balanced, but some clubs are set to face each other more than once:
             </DialogDescription>
