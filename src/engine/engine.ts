@@ -14,6 +14,37 @@ import { settings } from "@/lib/engine-settings";
 export const GOAL_MULTIPLIER_DEFAULT = 0.6;
 export const IDENTITY_BOOST_WEIGHT = 0.6;
 
+// ---------------------------------------------------------------------------
+// EDITABLE TUNING HOOKS (these read live Settings knobs — they do not alter the
+// ported RNG/event ordering; they only scale inputs/probabilities).
+// ---------------------------------------------------------------------------
+
+// Blowout dampener: once the leading side is `blowoutThreshold` goals up, every
+// shooting probability is scaled down based on how many goals deep into blowout
+// territory the match is. Replaces the old hardcoded `score_margin >= 5` logic.
+function blowout_modifier(score_margin: number): number {
+  const threshold = settings.blowoutThreshold;
+  const decay = settings.blowoutDecay;
+  if (!Number.isFinite(decay) || decay <= 0) return 1.0;
+  if (!Number.isFinite(threshold) || score_margin < threshold) return 1.0;
+  const depth = score_margin - threshold + 1; // goals deep into blowout territory
+  return 1.0 / (1.0 + depth * decay);
+}
+
+// Parity multiplier: scales how far each player's attributes sit from the 5.0
+// midpoint. 1.0 = untouched; <1.0 compresses skill gaps (closer games / upsets);
+// >1.0 exaggerates them (favourites dominate). Applied once at team build, so the
+// match math and RNG sequence are completely unchanged.
+const PARITY_ATTRS = [
+  "FIN", "SHO", "PAS", "VIS", "DRI", "PAC", "STA", "DEF", "TAC",
+  "POS_attr", "COM", "WR", "AGG", "STR", "AER",
+] as const;
+function parity_scale(v: number): number {
+  const p = settings.parityMultiplier;
+  if (!Number.isFinite(p) || p === 1.0) return v;
+  return Math.max(1.0, Math.min(10.0, 5.0 + (v - 5.0) * p));
+}
+
 // ---- RNG helpers mirroring Python's `random` module semantics ----
 function uniform(a: number, b: number): number {
   return a + Math.random() * (b - a);
