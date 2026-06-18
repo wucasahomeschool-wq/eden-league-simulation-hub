@@ -140,19 +140,29 @@ export function buildEngineTeam(
     | "injured_severe" | "saves" | "goals_conceded" | "clean_sheets"
   >[]
 ): EngineTeam {
-  const players: EnginePlayer[] = roster.map((r) => ({
-    ...r,
-    fatigue: 0.0,
-    goals: 0,
-    assists: 0,
-    fouls: 0,
-    yellow_cards: 0,
-    red_card: false,
-    injured_severe: false,
-    saves: 0,
-    goals_conceded: 0,
-    clean_sheets: 0,
-  }));
+  const players: EnginePlayer[] = roster.map((r) => {
+    // Apply the live Parity Multiplier to every raw attribute (and the overall
+    // rating) before the match math touches them. parity_scale is a no-op at 1.0.
+    const scaled: typeof r = { ...r, rating: parity_scale(r.rating) };
+    for (const k of PARITY_ATTRS) {
+      (scaled as unknown as Record<string, number>)[k] = parity_scale(
+        (r as unknown as Record<string, number>)[k]
+      );
+    }
+    return {
+      ...scaled,
+      fatigue: 0.0,
+      goals: 0,
+      assists: 0,
+      fouls: 0,
+      yellow_cards: 0,
+      red_card: false,
+      injured_severe: false,
+      saves: 0,
+      goals_conceded: 0,
+      clean_sheets: 0,
+    };
+  });
   return {
     name,
     tactical_style,
