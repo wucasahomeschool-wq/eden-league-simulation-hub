@@ -205,12 +205,14 @@ export const negotiateTrade = createServerFn({ method: "POST" })
     ].join("\n");
 
     const content = await callGateway(apiKey, system, user);
-    const parsed = extractJson<{ reply?: string; accepts?: unknown }>(content);
+    const parsed = extractJson<{ reply?: string; accepts?: unknown; cancels?: unknown }>(content);
     let reply = parsed && typeof parsed.reply === "string" ? parsed.reply : content;
-    // Tolerate the model returning a stringy/numeric truthy value for accepts.
-    const accepts = parsed?.accepts === true || parsed?.accepts === "true" || parsed?.accepts === 1;
+    // Tolerate the model returning a stringy/numeric truthy value for accepts/cancels.
+    const truthy = (v: unknown) => v === true || v === "true" || v === 1;
+    const cancels = truthy(parsed?.cancels);
+    const accepts = !cancels && truthy(parsed?.accepts);
     if (!reply.trim()) reply = "…";
-    return { reply: reply.trim(), accepts };
+    return { reply: reply.trim(), accepts, cancels };
   });
 
 const NEW_MANAGER_RULES = `
