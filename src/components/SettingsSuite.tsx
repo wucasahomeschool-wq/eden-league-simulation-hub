@@ -129,24 +129,18 @@ function LeagueSettings({
             label="Blowout dampener — trigger margin (goals)" value={s.blowoutThreshold} step={1} min={1} max={10}
             onCommit={(v) => setSettings({ blowoutThreshold: Math.round(v) })}
           />
-          <div className="py-2">
-            <div className="mb-1 flex items-center justify-between gap-3 text-sm">
-              <span className="text-muted-foreground">Blowout dampener — decay rate</span>
-              <span className="font-mono font-bold text-primary">{(s.blowoutDecay * 100).toFixed(0)}%</span>
-            </div>
-            <Slider
-              value={[s.blowoutDecay]}
-              min={0}
-              max={0.3}
-              step={0.01}
-              onValueChange={([v]) => setSettings({ blowoutDecay: Math.round(v * 100) / 100 })}
-            />
-            <p className="mt-1.5 text-[11px] text-muted-foreground">
-              Once a side leads by the trigger margin ({s.blowoutThreshold}+ goals), shooting probability is scaled down
-              for every goal deeper into blowout territory. <span className="font-semibold text-foreground">0%</span> disables
-              it; higher values cap runaway scorelines harder. Close games (e.g. 4-3) are never touched.
-            </p>
-          </div>
+          <NumberSetting
+            label="Blowout dampener — steepness (exponential)" value={s.blowoutDecay} step={0.05} min={0}
+            onCommit={(v) => setSettings({ blowoutDecay: Math.max(0, v) })}
+          />
+          <p className="-mt-1 pb-1 text-[11px] text-muted-foreground">
+            Once a side leads by the trigger margin ({s.blowoutThreshold}+ goals), scoring is suppressed and the
+            penalty grows <span className="font-semibold text-foreground">exponentially</span> with every further goal of
+            the lead. The steepness value controls how exponential it is — higher = harsher per-goal suppression, lower =
+            gentler, <span className="font-semibold text-foreground">0</span> disables it. The dampener also eases back
+            automatically if the trailing team scores and closes the gap. Any value is allowed.
+          </p>
+
 
           <ExemptSetting
             label="Manual-only clubs (games entered by hand, never simulated)"
