@@ -1,5 +1,9 @@
 import { useMemo, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import { useLeague } from "@/state/league";
+import { buildScheduleBrief } from "@/lib/schedule-brief";
+import { generateSchedule, fixScheduleWeek, type SpecialRequest } from "@/lib/schedule-ai.functions";
 import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -16,6 +20,7 @@ interface Draft {
 }
 
 const pairKey = (a: string, b: string) => [a, b].sort().join(" ⚔ ");
+const newKey = () => `${Date.now()}-${Math.random()}`;
 
 export function FixtureBuilder({
   weeks,
@@ -23,14 +28,16 @@ export function FixtureBuilder({
   onSaved,
   commit,
   saveLabelOverride,
+  phase = "regular",
 }: {
   weeks: number[];
   title: string;
   onSaved?: () => void;
   commit?: (entries: { week: number; home: string; away: string }[]) => void;
   saveLabelOverride?: string;
+  phase?: "regular" | "finalfour";
 }) {
-  const { state, addFixtures } = useLeague();
+  const { state, standings, addFixtures } = useLeague();
   const teams = state.teamOrder;
   const perWeekMatches = Math.floor(teams.length / 2);
 
@@ -39,6 +46,17 @@ export function FixtureBuilder({
   const [away, setAway] = useState(teams[1]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
 
+  // --- AI generation ---
+  const runGenerate = useServerFn(generateSchedule);
+  const runFix = useServerFn(fixScheduleWeek);
+  const [genHome, setGenHome] = useState<string>("");
+  const [genAway, setGenAway] = useState<string>("");
+  const [genWeek, setGenWeek] = useState<string>(""); // "" = any week
+  const [requests, setRequests] = useState<SpecialRequest[]>([]);
+  const [genLoading, setGenLoading] = useState(false);
+  const [fixLoading, setFixLoading] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+
   // Validation dialogs
   const [errorReport, setErrorReport] = useState<{ messages: string[]; gotoWeek: number } | null>(null);
   const [warnReport, setWarnReport] = useState<string[] | null>(null);
@@ -46,17 +64,63 @@ export function FixtureBuilder({
   const weekRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   const sameTeam = home === away;
+  const genSameTeam = genHome !== "" && genHome === genAway;
+  const canAddRequest = genHome !== "" && genAway !== "" && !genSameTeam;
 
   function add() {
     if (sameTeam) return;
-    setDrafts((prev) => [
-      ...prev,
-      { key: `${Date.now()}-${Math.random()}`, week, home, away },
-    ]);
+    setDrafts((prev) => [...prev, { key: newKey(), week, home, away }]);
   }
 
   function remove(key: string) {
     setDrafts((prev) => prev.filter((d) => d.key !== key));
+  }
+
+  function addRequest() {
+    if (!canAddRequest) return;
+    setRequests((prev) => [
+      ...prev,
+      { home: genHome, away: genAway, week: genWeek ? Number(genWeek) : null },
+    ]);
+    setGenHome("");
+    setGenAway("");
+    setGenWeek("");
+  }
+
+  function removeRequest(i: number) {
+    setRequests((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  async function generate() {
+    setGenError(null);
+    setGenLoading(true);
+    try {
+      const brief = buildScheduleBrief(state, standings, phase);
+      const res = await runGenerate({
+        data: {
+          phase,
+          teams,
+          weeks,
+          perWeek: perWeekMatches,
+          specialRequests: requests,
+          brief,
+        },
+      });
+      const seeded: Draft[] = res.fixtures
+        .filter((f) => weeks.includes(f.week))
+        .map((f) => ({ key: newKey(), week: f.week, home: f.home, away: f.away }));
+      setDrafts(seeded);
+      toast.success("AI schedule generated", {
+        description: "Review and hand-edit below, then save. We'll flag any conflicts.",
+      });
+    } catch (e) {
+      const m = e instanceof Error ? e.message : String(e);
+      if (m.includes("RATE_LIMIT")) setGenError("The fixture computer is busy — try again in a moment.");
+      else if (m.includes("CREDITS")) setGenError("AI credits exhausted. Add credits in Settings → Workspace → Usage.");
+      else setGenError("Couldn't generate a schedule. Try again, or build it manually below.");
+    } finally {
+      setGenLoading(false);
+    }
   }
 
   // --- Hard validation: blocks saving until every week is complete & balanced ---
@@ -122,6 +186,37 @@ export function FixtureBuilder({
     });
   }
 
+  async function aiFixConflict() {
+    if (!errorReport) return;
+    const target = errorReport.gotoWeek;
+    setFixLoading(true);
+    try {
+      const current = drafts.filter((d) => d.week === target).map((d) => ({ home: d.home, away: d.away }));
+      const res = await runFix({
+        data: { week: target, teams, perWeek: perWeekMatches, current },
+      });
+      // Replace ONLY this week's drafts with the AI-corrected set.
+      setDrafts((prev) => [
+        ...prev.filter((d) => d.week !== target),
+        ...res.fixtures.map((f) => ({ key: newKey(), week: target, home: f.home, away: f.away })),
+      ]);
+      setErrorReport(null);
+      // Re-validate; if other weeks still conflict, surface the next one.
+      requestAnimationFrame(() => {
+        const next = validateSchedule();
+        if (next) setErrorReport(next);
+        else toast.success(`Week ${target} fixed`, { description: "The conflict was resolved automatically." });
+      });
+    } catch (e) {
+      const m = e instanceof Error ? e.message : String(e);
+      if (m.includes("RATE_LIMIT")) toast.error("AI is busy", { description: "Try again in a moment." });
+      else if (m.includes("CREDITS")) toast.error("AI credits exhausted", { description: "Add credits in Settings → Workspace → Usage." });
+      else toast.error("Couldn't auto-fix", { description: "Please adjust this week manually." });
+    } finally {
+      setFixLoading(false);
+    }
+  }
+
   const byWeek = useMemo(() => {
     const map = new Map<number, Draft[]>();
     for (const w of weeks) map.set(w, []);
@@ -148,6 +243,65 @@ export function FixtureBuilder({
   return (
     <div className="rounded-xl border bg-card p-4">
       <h3 className="mb-3 text-sm font-bold uppercase tracking-wide">{title}</h3>
+
+      {/* ---- AI schedule generator ---- */}
+      <div className="mb-5 rounded-lg border border-dashed bg-panel/40 p-3">
+        <div className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+          ✨ AI Schedule Generator
+        </div>
+        <p className="mb-3 text-[11px] text-muted-foreground">
+          {phase === "finalfour"
+            ? "Generates dramatic Final Four matchups from current standings (best vs best). Add any must-have matchups below first."
+            : "Generates a balanced, exciting 12-week schedule from squad strength & archive data. Add any special-request matchups below first."}
+        </p>
+
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr_auto_auto] sm:items-end">
+          <Field label="Home (request)">
+            <TeamSelectOptional value={genHome} teams={teams} onChange={setGenHome} placeholder="Pick club" />
+          </Field>
+          <span className="hidden pb-2 text-center font-bold text-muted-foreground sm:block">vs</span>
+          <Field label="Away (request)">
+            <TeamSelectOptional value={genAway} teams={teams} onChange={setGenAway} placeholder="Pick club" />
+          </Field>
+          <Field label="Week (optional)">
+            <Select value={genWeek || "__any__"} onValueChange={(v) => setGenWeek(v === "__any__" ? "" : v)}>
+              <SelectTrigger className="w-full bg-card"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__any__">Any week</SelectItem>
+                {weeks.map((w) => <SelectItem key={w} value={String(w)}>Week {w}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          {canAddRequest && (
+            <Button variant="secondary" onClick={addRequest} className="font-semibold">ADD FIXTURE</Button>
+          )}
+        </div>
+        {genSameTeam && <p className="mt-2 text-xs text-destructive">A requested matchup needs two different clubs.</p>}
+
+        {requests.length > 0 && (
+          <ul className="mt-3 space-y-1">
+            {requests.map((r, i) => (
+              <li key={`${r.home}-${r.away}-${i}`} className="flex items-center justify-between gap-2 rounded-md bg-card px-2.5 py-1.5 text-xs">
+                <span className="font-medium">
+                  {r.home} <span className="text-muted-foreground">vs</span> {r.away}
+                  <span className="ml-2 text-muted-foreground">{r.week ? `· Week ${r.week}` : "· any week"}</span>
+                </span>
+                <button onClick={() => removeRequest(i)} className="font-semibold text-destructive hover:underline">remove</button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="mt-3 flex items-center gap-3">
+          <Button onClick={generate} disabled={genLoading} className="font-semibold">
+            {genLoading ? "Generating…" : "GENERATE SCHEDULE"}
+          </Button>
+          {requests.length > 0 && (
+            <span className="text-[11px] text-muted-foreground">{requests.length} special request{requests.length === 1 ? "" : "s"} queued</span>
+          )}
+        </div>
+        {genError && <p className="mt-2 text-xs text-destructive">{genError}</p>}
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-[auto_1fr_auto_1fr_auto] sm:items-end">
         <Field label="Week">
@@ -227,20 +381,25 @@ export function FixtureBuilder({
       </div>
 
       {/* Hard error — blocks saving until fixed */}
-      <Dialog open={!!errorReport} onOpenChange={(o) => { if (!o) acknowledgeError(); }}>
+      <Dialog open={!!errorReport} onOpenChange={(o) => { if (!o && !fixLoading) acknowledgeError(); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-destructive">⛔ Schedule is incomplete</DialogTitle>
+            <DialogTitle className="text-destructive">⛔ Schedule conflict in Week {errorReport?.gotoWeek}</DialogTitle>
             <DialogDescription>
-              You can't save yet — every week must have exactly {perWeekMatches} matches with each club playing
-              once. Fix the issue below:
+              Every week must have exactly {perWeekMatches} matches with each club playing once. Fix it yourself, or let
+              the AI repair this week with minimal changes:
             </DialogDescription>
           </DialogHeader>
           <ul className="space-y-1.5 text-sm text-foreground">
             {errorReport?.messages.map((m, i) => <li key={i}>• {m}</li>)}
           </ul>
-          <DialogFooter>
-            <Button onClick={acknowledgeError} className="font-semibold">OK — take me to Week {errorReport?.gotoWeek}</Button>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={acknowledgeError} disabled={fixLoading} className="font-semibold">
+              Change Manually
+            </Button>
+            <Button onClick={aiFixConflict} disabled={fixLoading} className="font-semibold">
+              {fixLoading ? "Fixing…" : "Use AI to Fix Conflict"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -286,6 +445,21 @@ function TeamSelect({
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger className="w-full bg-card"><SelectValue /></SelectTrigger>
+      <SelectContent>
+        {teams.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function TeamSelectOptional({
+  value, teams, onChange, placeholder,
+}: {
+  value: string; teams: string[]; onChange: (v: string) => void; placeholder: string;
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="w-full bg-card"><SelectValue placeholder={placeholder} /></SelectTrigger>
       <SelectContent>
         {teams.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
       </SelectContent>

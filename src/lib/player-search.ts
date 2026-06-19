@@ -44,6 +44,18 @@ const KNOWN_POSITIONS = new Set([
   "CB", "LB", "RB", "LWB", "RWB", "WINGER",
 ]);
 
+// Friendly words → canonical position code.
+const POSITION_ALIASES: Record<string, string> = {
+  striker: "ST", strikers: "ST", forward: "ST", forwards: "ST", st: "ST",
+  winger: "WINGER", wingers: "WINGER", wing: "WINGER",
+  leftwing: "LW", lw: "LW", rightwing: "RW", rw: "RW",
+  midfielder: "CM", midfielders: "CM", midfield: "CM", cm: "CM",
+  cam: "CAM", attackingmid: "CAM", cdm: "CDM", defensivemid: "CDM",
+  defender: "CB", defenders: "CB", centreback: "CB", centerback: "CB", cb: "CB",
+  fullback: "LB", leftback: "LB", lb: "LB", rightback: "RB", rb: "RB",
+  goalkeeper: "GK", keeper: "GK", gk: "GK",
+};
+
 type Op = ">" | ">=" | "<" | "<=" | "=";
 interface Comparison { key: keyof LeaguePlayer; op: Op; value: number; }
 
@@ -55,7 +67,10 @@ export interface ParsedQuery {
 }
 
 export function parseSearchQuery(raw: string): ParsedQuery {
-  let q = raw.trim();
+  // Normalise commas/semicolons to spaces so multi-parameter queries like
+  // "ST, fin > 9, fin < 9.5, pac > 9" parse cleanly. Multiple comparisons on
+  // the same attribute are supported (they are simply ANDed together).
+  let q = raw.trim().replace(/[,;]+/g, " ");
   const comparisons: Comparison[] = [];
 
   // Extract "<attr> <op> <number>" patterns (spaces optional around the op).
@@ -75,9 +90,12 @@ export function parseSearchQuery(raw: string): ParsedQuery {
     // explicit pos:XX
     const m = tok.match(/^pos:(.+)$/i);
     if (m) { position = m[1].toUpperCase(); continue; }
+    const lower = tok.toLowerCase();
     // bare known position token
     if (KNOWN_POSITIONS.has(tok.toUpperCase())) { position = tok.toUpperCase(); continue; }
-    nameTerms.push(tok.toLowerCase());
+    // friendly position word
+    if (POSITION_ALIASES[lower]) { position = POSITION_ALIASES[lower]; continue; }
+    nameTerms.push(lower);
   }
 
   return {

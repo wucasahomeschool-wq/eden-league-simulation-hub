@@ -363,6 +363,12 @@ function NegotiationPanel({ seed, onClose }: { seed: SessionSeed; onClose: () =>
           userMessage: msg,
         },
       });
+      if (res.cancels) {
+        const mgrName = manager?.name ?? seed.aiTeam;
+        toast.error(`${mgrName} has canceled the deal.`, { description: res.reply });
+        onClose();
+        return;
+      }
       setMessages((m) => [...m, { role: "manager", text: res.reply }]);
       setAgreedSignature(res.accepts ? sig : null);
       requestAnimationFrame(() => scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight));

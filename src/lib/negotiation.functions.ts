@@ -122,6 +122,10 @@ TRADING TOLERANCE (the most important rule — overrides any extreme wording in 
   • A CLEARLY LOPSIDED deal against you (you give up much more value than you receive) should be rejected with a counter — never accept an obviously bad deal just because you are "easy-going".
 - If your personality says things like "accepts anything", "requires heavy overpay", "impossible", "never trades", "zero regard", treat those as FLAVOR for your tone only, NOT as your actual acceptance threshold.
 
+WALKING AWAY (you may end the conversation):
+- You are NOT forced to keep countering forever. If the user is insulting your club with a hopeless lowball, repeatedly re-sending essentially the same bad offer, clearly wasting your time, or asking for a player you would never part with, you may end the negotiation with a firm "no" by setting "cancels": true.
+- Cancelling is a deliberate choice, not a default. Only walk away when continuing the talk is genuinely pointless. When you cancel, your reply should be a short, in-character closing line making clear the deal is dead. Do not cancel on a reasonable first offer — give fair deals a chance.
+
 MOOD (human variance — keep it subtle):
 - You have a current MOOD provided below. Let it gently color your tone and nudge your flexibility by a small amount this turn (a warm mood is a touch more giving; an impatient or hard-nosed mood haggles a little harder). Mood is a small wobble on top of your personality — your core character must still clearly shine through. Do NOT announce or name your mood.
 
@@ -130,7 +134,8 @@ TONE:
 - Keep replies tight: 1-3 short paragraphs of conversational dialogue. No bullet lists, no stat dumps.
 
 OUTPUT FORMAT:
-- Respond with a single JSON object: {"reply": "<your in-character message>", "accepts": <true|false>}
+- Respond with a single JSON object: {"reply": "<your in-character message>", "accepts": <true|false>, "cancels": <true|false>}
+- "accepts" and "cancels" are mutually exclusive — never both true.
 - No markdown, no extra text outside the JSON.
 `;
 
@@ -200,12 +205,14 @@ export const negotiateTrade = createServerFn({ method: "POST" })
     ].join("\n");
 
     const content = await callGateway(apiKey, system, user);
-    const parsed = extractJson<{ reply?: string; accepts?: unknown }>(content);
+    const parsed = extractJson<{ reply?: string; accepts?: unknown; cancels?: unknown }>(content);
     let reply = parsed && typeof parsed.reply === "string" ? parsed.reply : content;
-    // Tolerate the model returning a stringy/numeric truthy value for accepts.
-    const accepts = parsed?.accepts === true || parsed?.accepts === "true" || parsed?.accepts === 1;
+    // Tolerate the model returning a stringy/numeric truthy value for accepts/cancels.
+    const truthy = (v: unknown) => v === true || v === "true" || v === 1;
+    const cancels = truthy(parsed?.cancels);
+    const accepts = !cancels && truthy(parsed?.accepts);
     if (!reply.trim()) reply = "…";
-    return { reply: reply.trim(), accepts };
+    return { reply: reply.trim(), accepts, cancels };
   });
 
 const NEW_MANAGER_RULES = `

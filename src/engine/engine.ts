@@ -21,14 +21,24 @@ export const IDENTITY_BOOST_WEIGHT = 0.6;
 
 // Blowout dampener: once the leading side is `blowoutThreshold` goals up, every
 // shooting probability is scaled down based on how many goals deep into blowout
-// territory the match is. Replaces the old hardcoded `score_margin >= 5` logic.
+// territory the match is. The suppression now grows EXPONENTIALLY with each goal
+// of the lead (rather than the old flat linear `1 + depth*decay`), and because
+// the engine re-evaluates this every shot using the LIVE current margin, it also
+// RELAXES back toward 1.0 automatically when the trailing side scores and the
+// gap shrinks below the threshold. `blowoutDecay` is the steepness exponent:
+// higher = more aggressively exponential per-goal suppression, lower = gentler,
+// 0 (or below) disables it entirely.
 function blowout_modifier(score_margin: number): number {
   const threshold = settings.blowoutThreshold;
-  const decay = settings.blowoutDecay;
-  if (!Number.isFinite(decay) || decay <= 0) return 1.0;
+  const steepness = settings.blowoutDecay;
+  if (!Number.isFinite(steepness) || steepness <= 0) return 1.0;
   if (!Number.isFinite(threshold) || score_margin < threshold) return 1.0;
   const depth = score_margin - threshold + 1; // goals deep into blowout territory
-  return 1.0 / (1.0 + depth * decay);
+  // Exponential: each extra goal of lead bites harder than the last. The
+  // `steepness` knob shapes how fast the penalty escalates. Clamp the modifier
+  // so it can never fully kill scoring (floor 0.05) — upsets stay possible.
+  const penalty = Math.pow(depth, 1 + steepness) * steepness;
+  return Math.max(0.05, 1.0 / (1.0 + penalty));
 }
 
 // Parity multiplier: scales how far each player's attributes sit from the 5.0
