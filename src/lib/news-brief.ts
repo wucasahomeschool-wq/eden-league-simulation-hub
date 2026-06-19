@@ -199,8 +199,10 @@ export function buildRoundupBrief(
     `STANDINGS (bottom of the table):`,
     tableBottom,
     ``,
-    `GOLDEN BOOT RACE (top scorers, season to date):`,
+    `GOLDEN BOOT RACE (top scorers, season to date — supporting detail only, not the mandatory focus):`,
     topScorers(leaderboards, 5),
+    ``,
+    buildLeagueContext(state, standings),
   ].join("\n");
 }
 
