@@ -154,6 +154,8 @@ export function buildPostgameBrief(state: LeagueState, fixtureId: string, standi
     ``,
     `INJURIES IN THIS MATCH:`,
     injuries,
+    ``,
+    buildLeagueContext(state, standings),
   ].join("\n");
 }
 
