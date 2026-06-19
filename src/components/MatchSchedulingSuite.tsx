@@ -46,6 +46,7 @@ export function MatchSchedulingSuite() {
           title="New Season Builder (Weeks 1–12)"
           commit={scheduleNewSeason}
           saveLabelOverride="START SEASON WITH THESE FIXTURES"
+          phase="regular"
         />
       </div>
     );
