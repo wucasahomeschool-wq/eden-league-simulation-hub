@@ -39,6 +39,7 @@ export function SimulationTerminal({
   const teams = state.teamOrder;
   const blowoutThreshold = state.settings?.blowoutThreshold ?? settings.blowoutThreshold;
   const blowoutDecay = state.settings?.blowoutDecay ?? settings.blowoutDecay;
+  const parityMultiplier = state.settings?.parityMultiplier ?? settings.parityMultiplier;
 
   const [home, setHome] = useState(initialHome ?? teams[0]);
   const [away, setAway] = useState(initialAway ?? teams[1]);
