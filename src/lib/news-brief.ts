@@ -248,7 +248,9 @@ export function buildDramaBrief(
     `TOP SCORERS (season to date):`,
     topScorers(leaderboards, 5),
     ``,
-    `CURRENT ABSENTEES (injuries & suspensions):`,
+    `CURRENT ABSENTEES (injuries & suspensions — supporting detail only, not the mandatory focus):`,
     injured.length ? injured.slice(0, 12).join("\n") : "  - Full squads available across the league.",
+    ``,
+    buildLeagueContext(state, standings),
   ].join("\n");
 }
