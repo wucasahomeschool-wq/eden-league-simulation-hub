@@ -120,7 +120,7 @@ function describePlayers(state: LeagueState, payload: MatchPayload): string {
   return lines.length ? lines.join("\n") : "  - No individual events recorded.";
 }
 
-export function buildPostgameBrief(state: LeagueState, fixtureId: string): string | null {
+export function buildPostgameBrief(state: LeagueState, fixtureId: string, standings: StandingRow[]): string | null {
   const payload = state.payloads[fixtureId];
   const result = state.results[fixtureId];
   if (!payload || !result) return null;
