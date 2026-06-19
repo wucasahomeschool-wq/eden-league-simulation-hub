@@ -51,7 +51,7 @@ export function NewsSuite() {
     if (tab === "postgame") {
       const id = fixtureId || playedFixtures[0]?.id;
       if (!id) { setError("No completed match with recorded events yet."); return; }
-      brief = buildPostgameBrief(state, id);
+      brief = buildPostgameBrief(state, id, standings);
     } else if (tab === "roundup") {
       const wk = week || playedWeeks[0];
       if (!wk) { setError("No completed match weeks yet."); return; }
