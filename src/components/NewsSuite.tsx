@@ -151,18 +151,16 @@ export function NewsSuite() {
       </div>
 
       <label className="flex flex-col gap-1 text-xs font-semibold uppercase text-muted-foreground">
-        STORY ANGLE <span className="font-normal normal-case">(optional — tell the writer what to focus on)</span>
+        STORY ANGLE <span className="font-normal normal-case">(optional — ask the analyst anything: tactics, injuries, schedule difficulty, matchups)</span>
         <textarea
           value={focus}
           onChange={(e) => setFocus(e.target.value)}
-          rows={2}
+          rows={3}
           maxLength={500}
           placeholder={
-            tab === "drama"
-              ? 'e.g. "Frame this around the underdog playoff run" or "Focus on the title-race pressure on the leaders"'
-              : tab === "roundup"
-              ? 'e.g. "Lead with the relegation battle" or "Spotlight the golden boot race"'
-              : 'e.g. "Focus on the goalkeeper\'s performance" or "Frame it as a tactical upset"'
+            'e.g. "How are [team]\u2019s tactics affecting their results \u2014 is it working, or should [manager] switch?" \u00b7 ' +
+            '"[team] are missing [injured player] this week \u2014 how will that change their lineup and tactics?" \u00b7 ' +
+            '"Analyse [team]\u2019s remaining schedule \u2014 is it harder or easier than their rivals\u2019?"'
           }
           className="resize-y rounded-md border bg-background px-3 py-2 text-sm font-normal text-foreground placeholder:text-muted-foreground"
         />
