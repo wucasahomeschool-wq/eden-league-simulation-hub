@@ -8,6 +8,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
 
 const TEMPO_MAP = [1.0, 1.2, 1.4];
 const TEMPO_LABEL = ["Slow", "Normal", "Fast"];
