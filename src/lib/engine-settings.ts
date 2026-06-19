@@ -15,7 +15,7 @@ export interface EngineSettings {
   weatherEffects: boolean;       // randomized weather modifiers
   playoffPenalties: boolean;     // drawn playoff ties go to a shootout
   blowoutThreshold: number;      // goal margin at which the blowout dampener activates (>= this many goals)
-  blowoutDecay: number;          // per-goal-deep shooting-probability decay once a match is in blowout territory
+  blowoutDecay: number;          // steepness exponent for the EXPONENTIAL blowout dampener (higher = harsher per-goal suppression; 0 = off)
   parityMultiplier: number;      // scales how much raw player attributes matter (1.0 = normal, <1 = closer games, >1 = wider gaps)
 
   // ---- Contract engine ----
@@ -49,7 +49,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   weatherEffects: true,
   playoffPenalties: true,
   blowoutThreshold: 3,
-  blowoutDecay: 0.05,
+  blowoutDecay: 0.6,
   parityMultiplier: 1.0,
 
   demandModifierMin: 0.8,
