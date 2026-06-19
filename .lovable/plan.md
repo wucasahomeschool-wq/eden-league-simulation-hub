@@ -1,143 +1,65 @@
-# Eden League — Negotiation polish, search, and the Draft Suite
+# Eden League — Six-Part Upgrade Plan
 
-Four changes. 1–3 are contained; 4 is a large new offseason system that also
-extends the trade engine to handle draft picks. Cross-suite navigation infra
-(needed for "View in Team Editor" and "NEGOTIATE") is built once and reused.
+## 1. Exponential, editable, two-way blowout dampener
+**Files:** `src/engine/engine.ts`, `src/lib/engine-settings.ts`, `src/components/SettingsSuite.tsx`, `src/components/SimulationTerminal.tsx`
 
-## 1. Balance trading tolerance + add human variance
+- Reframe `blowoutDecay` as a **steepness exponent** (rename label, keep the key to avoid breaking saved state). Default ~`0.05` becomes a steepness factor; sensible new default around `0.6`.
+- Rewrite `blowout_modifier(score_margin)` so suppression grows **exponentially with each goal of lead** instead of a flat linear `1 + depth*decay`:
+  - `depth = score_margin - threshold + 1`
+  - new: `modifier = 1 / (1 + depth^(1 + steepness))` (or `Math.pow(1+steepness, depth)` denominator) — each additional goal of lead bites harder than the last; `steepness` controls how exponential the curve is.
+- **Two-way is already structural** (the engine passes the *live* current margin each shot, so when the trailing team scores the margin shrinks and the modifier relaxes automatically). I'll verify this at the three call sites (penalty, open-play SP, header SP) and confirm the modifier rises back toward 1.0 as the gap closes — no separate "reduction" branch needed, but I'll document it so the behavior is intentional and visible.
+- **Settings UI:** replace the decay `Slider` with an editable `NumberSetting` (free-form numeric input, no min/max cap on the high end) so any value is allowed. Update help text to explain "higher = more exponential / harsher per-goal suppression; lower = gentler."
+- **Simulation Terminal:** the existing blowout `Slider` there is replaced with an editable numeric field bound to the same `blowoutDecay` setting (mirrors Settings).
 
-The current personalities range from "accepts anything" to "impossible". Two
-fixes, both in the AI layer only (personality text stays as flavor):
+## 2. AI managers can cancel a negotiation
+**Files:** `src/lib/negotiation.functions.ts`, `src/components/NegotiationSuite.tsx`
 
-- **Compress tolerance into a usable band.** In `src/lib/negotiation.functions.ts`,
-  add a normalized "tolerance" instruction to the system prompt that overrides
-  extreme wording: every manager should accept a *fair-to-slightly-favorable*
-  deal eventually, and reject only clearly lopsided ones. The personality still
-  shifts *how hard* they push (tough managers haggle more, fair ones less), but
-  no manager is auto-yes or auto-no. Phrase it as a rule: "Tolerance ranges only
-  from somewhat-stubborn to somewhat-generous; never refuse a genuinely fair
-  deal and never accept a clearly bad one."
-- **Add mood / human variance.** Inject a per-reply hidden "mood" (e.g. a random
-  pick from a small set like upbeat, impatient, distracted, hard-nosed, warm)
-  passed into the prompt each turn, instructing the model to color tone and
-  flexibility *slightly* without abandoning the core personality. Keep the
-  existing `temperature: 0.9`. The mood nudges acceptance threshold by a small
-  amount so the same offer isn't always judged identically — making repeat
-  negotiations feel alive but still personality-driven.
+- Extend the negotiation JSON contract from `{reply, accepts}` to `{reply, accepts, cancels}`. Update `NEGOTIATION_RULES` to permit a hard "no": a manager may set `cancels: true` when an offer is insulting/hopeless or the user is wasting their time — a genuine walk-away, not forced to keep countering.
+- Parse `cancels` tolerantly (same pattern as `accepts`).
+- In `NegotiationSuite`, when a reply has `cancels: true`: close/exit the negotiation window and surface the message **"{managerName} has canceled the deal."** (toast + reset of the active negotiation state). Keep existing user-side CANCEL/DECLINE/ACCEPT buttons intact.
 
-Net effect: negotiations are winnable with all 24 managers, vary turn to turn,
-and still feel like distinct characters.
+## 3. Smarter, less repetitive newsroom that can answer hard tactical questions
+**Files:** `src/lib/news-brief.ts`, `src/lib/news.functions.ts`, `src/components/NewsSuite.tsx`
 
-## 2. Remove the utility display on the Trades Suite
+- **Root cause of the morale/top-scorer obsession:** the `drama` brief leads with morale + top scorers and the roundup always appends the golden-boot race, so those are the only "color" facts the model gets. Fix by giving every news kind a **richer, fuller league brief**.
+- Add a new shared `buildLeagueContext(state, standings, leaderboards)` digest that includes, for relevant teams: full roster ratings & values, tactical style + favored style, recent form/results, remaining schedule (opponents + their strength), current injuries/suspensions, budget/cap, and a short plain-language note on how the sim engine weighs attributes/tactics (so the writer can reason about *why* results happen).
+- Append this context to all three briefs, and de-emphasize morale/top-scorer (include them but as optional supporting facts, not the headline anchor).
+- Update `SHARED_RULES` in `news.functions.ts`: instruct the writer to behave like a real analyst — directly answer tactical/strategic prompts with a clear verdict (is the tactic working? better option? schedule difficulty vs peers? injury impact on lineup?), grounded in the supplied data, and to **avoid defaulting to morale/top-scorer** unless directly relevant.
+- The free-form "Story Angle" box already passes `focus`; ensure the harder example prompts (tactics analysis, injury impact, schedule difficulty) are surfaced as placeholder examples.
 
-In `src/components/TradesSuite.tsx`, delete the two `Utility +{deltaUA/UB}` lines
-in `ProposalCard`. Utility still drives ranking internally; it's just no longer
-shown.
+## 4. Parity multiplier control in the Simulation Terminal
+**Files:** `src/components/SimulationTerminal.tsx`
 
-## 3. Player search bars (Trades + Negotiation suites)
+- Add a Parity Multiplier control alongside the existing Tempo / Goal / Blowout controls, bound to `state.settings.parityMultiplier` via `setSettings` (same pattern as the blowout control already there). Editable so it matches the Settings suite.
 
-A shared `<PlayerSearch />` component (new `src/components/PlayerSearch.tsx`)
-rendered at the bottom of both suites.
+## 5. Multi-parameter + natural-language player search
+**Files:** `src/lib/player-search.ts`, new `src/lib/player-search.functions.ts`, `src/components/PlayerSearch.tsx`
 
-- **Query parsing.** Free-text box. Plain words match player name (substring).
-  Structured filters can be combined in the same query, space-separated:
-  - position: `pos:RW` or just a bare known position token.
-  - attribute comparisons: `speed > 8.5`, `FIN >= 9`, `strength < 4`, etc.
-    A keyword map resolves friendly words (speed→PAC, finishing→FIN,
-    strength→STR, vision→VIS, pace→PAC, rating/ovr→rating, …) **and** raw codes
-    (PAC, FIN, STR, VIS, OVR…). Operators: `> >= < <= =`.
-- **Results.** Scans every team's roster. Each hit renders the player's full
-  stat row (same columns as the Team Editor slot) plus the owning club, and a
-  **"View in Team Editor"** button.
-- **View in Team Editor** uses the new navigation infra (below) to switch to the
-  Team Editor suite with that club preselected (and the player highlighted).
+- **Multi-parameter parsing already mostly works** (the regex collects every `attr op number` and ANDs them, plus position + name terms). I'll harden it so a query like `ST, fin > 9, fin < 9.5, pac > 9` reliably parses: tolerate commas as separators, allow the same attribute to appear twice (range: both a `>` and a `<` on `FIN`), and confirm all comparisons are ANDed. Add quick unit-style verification.
+- **Natural language:** add a toggle/"Ask AI" mode. When the user types prose ("fast wingers with great stamina"), call a new `createServerFn` (`interpretSearch`) that uses Lovable AI to translate the sentence into the structured query grammar (position + comparisons), then feed that back through the existing `parseSearchQuery`/`playerMatchesQuery` pipeline so results render identically. Handle 429/402 with inline errors. Falls back to literal parsing if AI is unavailable.
 
-## 4. Draft picks as assets + the Draft Suite
+## 6. AI fixture generation with manual editing + conflict auto-fix
+**Files:** `src/components/MatchSchedulingSuite.tsx`, `src/components/FixtureBuilder.tsx`, new `src/lib/schedule-ai.functions.ts`, supporting brief builder
 
-### 4a. Cross-suite navigation infrastructure
-The Hub currently holds `idx` in local state. Add a lightweight navigation
-context (new `src/state/navigation.tsx`, provided in `routes/index.tsx`) exposing
-`goToSuite(name, payload?)`. Payload carries optional focus hints
-(`{ team, player }` for Team Editor; a pending negotiation seed for Negotiation).
-Add "Draft" to the `SUITES` list. Team Editor reads the focus hint to preselect
-the club; Negotiation reads a seeded session and, on close, calls back to Draft.
-
-### 4b. Draft picks as tradeable assets (year-round, all suites)
-Extend the data model and trade engine so picks trade like players/cash.
-
-- **State.** Add to `LeagueState`: `draft?: DraftState` and `draftPicks: DraftPick[]`.
-  `DraftPick = { id, season, round (1|2), slot (1–24), originalTeam, owner }`.
-  Picks are (re)generated for the upcoming season from reverse final standings;
-  `owner` changes when traded. Persists in the Cloud `league_state` JSON like
-  everything else.
-- **Trade terms.** Extend `TradeProposal` / negotiation `NegotiationTerms` with
-  optional `aPicks` / `bPicks` (pick ids). `tradeBlockReason` validates pick
-  ownership (the sending club must currently own the pick) and rejects
-  duplicates. `executeManualTrade` / `executeTrade` reassign pick `owner`.
-- **AI trade engine.** `buildTradeMarketBrief` lists each club's owned picks;
-  `trade-ai.functions.ts` may include picks in `aSends`/`bSends`. Returned deals
-  are re-validated client-side exactly like player deals before surfacing.
-- **UI.** Trade/Negotiation pickers gain a "Picks" selector alongside players;
-  proposal cards show traded picks (e.g. "S6 R1 P3").
-
-### 4c. The Draft Suite (offseason)
-New `src/components/DraftSuite.tsx`. Locked until the regular season + playoffs
-are complete (reuse existing season-end detection); shows a locked message
-otherwise.
-
-**Stage 1 — Prospect pool.**
-- Sort dropdown (by OVR, by position, by name).
-- **"CREATE NEW PROSPECT PLAYER"** → prospect creation screen.
-- Once 48 prospects exist, **"START EDEN LEAGUE DRAFT"** appears.
-
-**Prospect creation.**
-- Editable name (default "NEW PROSPECT PLAYER"), position, Overall Rating.
-- On confirm, call a new AI server fn `generateProspectRatings`
-  (`src/lib/draft-ai.functions.ts`): given name + position + OVR, returns the
-  individual attribute spread (FIN, PAC, STR, VIS, …) themed by the name
-  (Boulder→STR/TAC up, Einstein→COM/VIS/POS up, Noodle→STR down), constrained so
-  the weighted overall lands on the chosen OVR.
-- Show an editable player slot (Team Editor style, **without** morale, salary, or
-  health fields) prefilled with AI values. **"ADD PROSPECT PLAYER TO DRAFT
-  POOL"** saves it and returns to the pool.
-
-**Stage 2 — Draft board.**
-- Build 48 picks from reverse final regular-season standings (last place = pick 1;
-  round 2 repeats the same order). These reuse the `DraftPick` records, so any
-  picks already traded show their current owner.
-- Each pick = a slot in order. The current pick has **"SIMULATE PICK"**.
-- On SIMULATE PICK:
-  1. Run the AI trade engine scoped to draft assets/needs. Surface **only the
-     best** proposals (high combined value; none if nothing good) to avoid spam.
-  2. Any proposal involving a user-controlled club shows a **"NEGOTIATE"** button
-     that jumps to the Negotiation Suite (seeded); on close it returns to the
-     Draft Suite at the same pick. The user may also initiate their own offers to
-     user clubs via the same route.
-  3. After trades are accepted/declined, the pick's **current owner** selects.
-     AI-owned picks: an AI selection (best available prospect by need + OVR, via
-     a small server fn or deterministic best-fit). User-owned picks: manual
-     pick from the pool.
-  4. Selected prospect is removed from the pool and **added to the owning club's
-     roster** with a fixed rookie contract (**$2M, 2 years**), then auto-slotted
-     into the starting XI if good enough (reuse `bestReplacement` / lineup sync),
-     exactly like an acquired player.
-  5. Return to the board for the next pick.
-- When all 48 picks are made, the draft is marked complete and the pool/board
-  reset for the next offseason.
+- **Generate button + special-request UI** in the Match Scheduling suite:
+  - A `GENERATE SCHEDULE` button plus two team dropdowns (24 teams each) and an optional third "week" dropdown for special-request matches. When both team dropdowns are set, an `ADD FIXTURE` (special request) button appears; pressing it queues that requested matchup (optionally pinned to a week) and resets the dropdowns so more can be added.
+  - On `GENERATE SCHEDULE`, call a new `createServerFn` (`generateSchedule`) with: the phase (regular 12 weeks vs Final Four), the list of special requests, team list, and a data brief.
+- **Data the AI uses:**
+  - Regular season (Weeks 1–12): pull **last season's data from the version archive** (`listVersions` / latest archived snapshot) plus current rosters/strengths to build an *exciting yet fair* schedule, honoring special requests. Fairness is best-effort (strength-balanced opponents across the 12 weeks); the prompt explicitly acknowledges perfect equality is impossible.
+  - Final Four (Weeks 13–16): use **this season's first-12-week results + current standings** to make matchups dramatic — best vs best, worst vs worst — with no fairness constraint.
+- **Output handling:** AI returns a structured list of `{week, home, away}` entries. These populate the existing `FixtureBuilder` drafts so the user can still hand-edit before saving. The brief/output schema is kept small (flat arrays) to stay within the gateway's structured-output limits; validate and repair the count client-side.
+- **Conflict handling during manual edits:** `FixtureBuilder` already validates (each team once/week, exactly N matches/week, rematch warnings). Upgrade the error dialog so when a conflict is detected the user gets **two buttons**:
+  - `Change Manually` — dismiss and keep editing freely (current behavior, jumps to the bad week).
+  - `Use AI to Fix Conflict` — call a new `fixScheduleWeek` server fn that takes the offending week's fixtures + constraints and returns a **minimally-edited** valid week (swap the fewest games possible; if one swap fixes it, only change that one). Replace just that week's drafts with the AI result, then re-validate.
+- All schedule AI calls go through Lovable AI (`createServerFn`, server-side key), with 429/402/timeout handling surfaced in the dialog.
 
 ## Technical notes
-- AI server fns (`generateProspectRatings`, draft trade scoping, AI pick) follow
-  the existing gateway pattern in `negotiation.functions.ts` /
-  `trade-ai.functions.ts` (model `google/gemini-3-flash-preview`, 30s abort,
-  429/402 handling, tolerant JSON extraction). All AI output is re-validated
-  client-side; the AI never mutates state directly.
-- Rookie attributes use the existing `computeOverall` so the slot's OVR stays
-  consistent with the rest of the app.
-- Draft state and picks persist via the existing Cloud `league_state` flow; no
-  schema/table changes. `undoStack` stays local as today.
-- Golden rule preserved: the match simulation engine is untouched.
+- New server functions live in client-safe `src/lib/*.functions.ts` modules and are called via `useServerFn`.
+- `blowoutDecay` key is reused (not renamed) so existing Cloud-saved `LeagueState`/engine-settings keep loading; only its *meaning* and UI change.
+- Golden Rule: only the blowout formula (item 1) touches engine math, and it's an isolated tuning hook (`blowout_modifier`) — the ported RNG/event loop is untouched. All other items are UI/AI/data layers.
 
-## Out of scope
-- Promotion/relegation automation (user still edits the relegated club into the
-  new club in the Team Editor, as today).
-- Multi-round snake ordering (using reverse standings, same order both rounds).
+## Validation
+- Build check; run a few sims at extreme blowout values to confirm exponential suppression and recovery when the trail team scores.
+- Exercise a negotiation to see a manager walk away; verify the cancel message + window exit.
+- Generate a regular-season and a Final-Four schedule, then introduce a manual conflict and test both dialog buttons.
+- Test multi-param and natural-language searches.
