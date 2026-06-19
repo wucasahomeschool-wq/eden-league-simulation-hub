@@ -165,16 +165,44 @@ export function SimulationTerminal({
         </div>
         <div className="rounded-lg border bg-card p-4">
           <div className="mb-3 flex items-center justify-between text-sm font-semibold">
-            <span>Blowout Dampener ({blowoutThreshold}+ goal lead)</span>
-            <span className="text-primary">{(blowoutDecay * 100).toFixed(0)}%</span>
+            <span>Blowout Dampener — steepness ({blowoutThreshold}+ goal lead)</span>
+            <span className="text-primary">{blowoutDecay.toFixed(2)}</span>
           </div>
-          <Slider min={0} max={0.3} step={0.01} value={[blowoutDecay]}
-            onValueChange={(v) => setSettings({ blowoutDecay: Math.round(v[0] * 100) / 100 })} />
-          <div className="mt-2 flex justify-between text-xs text-muted-foreground">
-            <span>0% Off</span><span>30% Hard cap</span>
+          <Input
+            type="number" min={0} step={0.05} defaultValue={blowoutDecay}
+            key={`blowout-${blowoutDecay}`}
+            onBlur={(e) => {
+              const v = parseFloat(e.target.value);
+              if (Number.isFinite(v)) setSettings({ blowoutDecay: Math.max(0, v) });
+            }}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+            className="h-9 text-center font-mono"
+          />
+          <p className="mt-2 text-xs text-muted-foreground">
+            Exponential per-goal suppression. Higher = harsher; 0 = off. Eases back if the trailing side scores.
+          </p>
+        </div>
+        <div className="rounded-lg border bg-card p-4">
+          <div className="mb-3 flex items-center justify-between text-sm font-semibold">
+            <span>Parity Multiplier (skill-gap)</span>
+            <span className="text-primary">{parityMultiplier.toFixed(2)}×</span>
           </div>
+          <Input
+            type="number" min={0} step={0.05} defaultValue={parityMultiplier}
+            key={`parity-${parityMultiplier}`}
+            onBlur={(e) => {
+              const v = parseFloat(e.target.value);
+              if (Number.isFinite(v)) setSettings({ parityMultiplier: Math.max(0, v) });
+            }}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+            className="h-9 text-center font-mono"
+          />
+          <p className="mt-2 text-xs text-muted-foreground">
+            1.00× normal. Below 1 compresses skill gaps (more upsets); above 1 widens them (favourites dominate).
+          </p>
         </div>
       </div>
+
 
 
       {/* Scoreboard */}
