@@ -25,6 +25,7 @@ export function MatchSchedulingSuite() {
             title="Final Four Builder (Weeks 13–16 · 12 matches each)"
             commit={scheduleFinalFour}
             saveLabelOverride="SAVE FINAL FOUR"
+            phase="finalfour"
           />
           <StandingsReference />
         </div>
